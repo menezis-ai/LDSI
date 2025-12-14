@@ -9,4 +9,4 @@ pub mod cleaner;
 pub mod injector;
 
 pub use cleaner::{clean_default, clean_text, extract_semantic_core, CleanerConfig, Language};
-pub use injector::{ApiType, Injector, InjectorError, LlmConfig};
+pub use injector::{ApiType, Injector, InjectorError, LlmConfig, MultiInjector, openrouter_models};

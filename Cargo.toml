@@ -1,6 +1,6 @@
 [package]
 name = "ldsi"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Julien DABERT"]
 description = "Lyapunov-Dabert Stability Index - White Box LLM Benchmark"
@@ -36,6 +36,28 @@ regex = "1.10"
 
 # Unicode normalization
 unicode-normalization = "0.1"
+
+# ========== WEB UI (Control Center) ==========
+
+# Web Server
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
+
+# HTML Templates (Server-side rendering)
+tera = "1.19"
+
+# Embed static files in binary (Portable!)
+rust-embed = "8.0"
+
+# UUID for benchmark sessions
+uuid = { version = "1.0", features = ["v4"] }
+
+# Async utilities
+futures = "0.3"
+
+# MIME type detection
+mime_guess = "2.0"
 
 [profile.release]
 opt-level = 3

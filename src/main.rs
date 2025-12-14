@@ -9,12 +9,13 @@
 mod audit;
 mod core;
 mod probe;
+mod server;
 
 use clap::{Parser, Subcommand};
 use std::fs;
 use std::time::Instant;
 
-use audit::{AuditEntry, AuditLogger, SummaryReport};
+use audit::AuditLogger;
 use core::{compute_ldsi, LdsiCoefficients, LdsiResult, LdsiVerdict};
 use probe::{clean_default, ApiType, Injector, LlmConfig};
 
@@ -46,6 +47,17 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Lance le Control Center (interface web locale)
+    Serve {
+        /// Port du serveur web
+        #[arg(short, long, default_value = "3000")]
+        port: u16,
+
+        /// Clé API OpenRouter (ou variable env OPENROUTER_API_KEY)
+        #[arg(short = 'k', long)]
+        openrouter_key: Option<String>,
+    },
+
     /// Analyse deux textes locaux (fichiers ou stdin)
     Analyze {
         /// Fichier texte A (réponse standard)
@@ -87,11 +99,11 @@ enum Commands {
         #[arg(short, long, default_value = "llama3")]
         model: String,
 
-        /// Type d'API (ollama, openai, anthropic)
+        /// Type d'API (ollama, openai, anthropic, openrouter)
         #[arg(short = 't', long, default_value = "ollama")]
         api_type: String,
 
-        /// Clé API (pour OpenAI/Anthropic)
+        /// Clé API (pour OpenAI/Anthropic/OpenRouter)
         #[arg(short, long)]
         api_key: Option<String>,
 
@@ -228,6 +240,14 @@ async fn main() {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Serve { port, openrouter_key } => {
+            // Chercher la clé API dans l'environnement si non fournie
+            let api_key = openrouter_key
+                .or_else(|| std::env::var("OPENROUTER_API_KEY").ok());
+
+            server::start_server(port, api_key).await;
+        }
+
         Commands::Analyze {
             text_a,
             text_b,
@@ -284,14 +304,19 @@ async fn main() {
                 "ollama" => ApiType::Ollama,
                 "openai" => ApiType::OpenAI,
                 "anthropic" => ApiType::Anthropic,
+                "openrouter" => ApiType::OpenRouter,
                 _ => {
-                    eprintln!("Type API inconnu: {}. Utiliser: ollama, openai, anthropic", api_type);
+                    eprintln!("Type API inconnu: {}. Utiliser: ollama, openai, anthropic, openrouter", api_type);
                     std::process::exit(1);
                 }
             };
 
             let config = LlmConfig {
-                base_url: url,
+                base_url: if api == ApiType::OpenRouter {
+                    "https://openrouter.ai/api".to_string()
+                } else {
+                    url
+                },
                 model: model.clone(),
                 api_key,
                 api_type: api,
@@ -360,7 +385,6 @@ async fn main() {
             println!("  Hapax:         {}", result.hapax_count);
             println!("  Hapax ratio:   {:.6}", result.hapax_ratio);
 
-            // Entropie bigrammes
             let h2 = core::entropy::compute_ngram_entropy(&content, 2);
             println!("  H(bigrammes):  {:.6} bits", h2);
         }
@@ -392,11 +416,13 @@ async fn main() {
 ║     Auteur: Julien DABERT                                   ║
 ║     Benchmark White Box pour LLM                            ║
 ║                                                              ║
-║     Basé sur:                                                ║
-║       - Théorie de la Stabilité de Lyapunov                 ║
-║       - Distance de Compression Normalisée (NCD)            ║
-║       - Entropie de Shannon                                  ║
-║       - Théorie des Graphes                                  ║
+║     Commandes:                                               ║
+║       serve    - Lance le Control Center (Web UI)           ║
+║       analyze  - Analyse deux textes                         ║
+║       inject   - Test live sur un LLM                       ║
+║       ncd      - Distance de compression                     ║
+║       entropy  - Entropie de Shannon                         ║
+║       topology - Analyse de graphe                           ║
 ║                                                              ║
 ║     Zéro réseau de neurones. Que des maths.                 ║
 ║                                                              ║

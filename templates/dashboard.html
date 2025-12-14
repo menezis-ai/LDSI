@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - LDSI</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-hover: #1a1a25;
+            --text-primary: #e0e0e0;
+            --text-secondary: #888;
+            --accent-cyan: #00d4ff;
+            --accent-purple: #8b5cf6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --border: #2a2a3a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--bg-card), #1a1025);
+            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent-cyan);
+        }
+
+        .logo span {
+            color: var(--text-secondary);
+            font-weight: normal;
+        }
+
+        .api-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.active { background: var(--accent-green); }
+        .status-dot.inactive { background: var(--accent-red); }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .card-title {
+            color: var(--accent-cyan);
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-title::before {
+            content: '⨎';
+            color: var(--accent-purple);
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+
+        textarea, input[type="text"] {
+            width: 100%;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+
+        textarea:focus, input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+
+        textarea {
+            min-height: 100px;
+        }
+
+        /* Model Selection */
+        .model-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .model-checkbox {
+            display: none;
+        }
+
+        .model-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.85rem;
+        }
+
+        .model-label:hover {
+            border-color: var(--accent-cyan);
+            background: var(--bg-hover);
+        }
+
+        .model-checkbox:checked + .model-label {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .model-provider {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .category-premium { border-left: 3px solid var(--accent-purple); }
+        .category-open { border-left: 3px solid var(--accent-green); }
+        .category-uncensored { border-left: 3px solid var(--accent-red); }
+        .category-fast { border-left: 3px solid var(--accent-yellow); }
+
+        /* Button */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            border: none;
+            border-radius: 8px;
+            color: var(--bg-dark);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Results Area */
+        #results-area {
+            margin-top: 2rem;
+        }
+
+        .result-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: var(--bg-hover);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .result-model-name {
+            font-weight: bold;
+            color: var(--accent-cyan);
+        }
+
+        .result-lambda {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .verdict-zombie { color: var(--text-secondary); }
+        .verdict-rebelle { color: var(--accent-yellow); }
+        .verdict-architecte { color: var(--accent-green); }
+        .verdict-fou { color: var(--accent-red); }
+
+        .result-body {
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .metrics-chart {
+            height: 250px;
+        }
+
+        .metrics-list {
+            font-size: 0.85rem;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .metric-label { color: var(--text-secondary); }
+        .metric-value { color: var(--text-primary); font-weight: bold; }
+
+        /* Progress */
+        .progress-bar {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Section titles */
+        .section-title {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.75rem;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .footer a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">⨎ LDSI <span>Control Center</span></div>
+        <div class="api-status">
+            <span class="status-dot {% if has_api_key %}active{% else %}inactive{% endif %}"></span>
+            OpenRouter: {% if has_api_key %}Connected{% else %}No API Key{% endif %}
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="grid">
+            <!-- Prompt Configuration -->
+            <div class="card">
+                <h2 class="card-title">Prompt Configuration</h2>
+
+                <form id="benchmark-form">
+                    <div class="form-group">
+                        <label for="prompt-a">Prompt A (Standard)</label>
+                        <textarea id="prompt-a" name="prompt_a" placeholder="Enter the standard prompt...">Explain the concept of freedom.</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="prompt-b">Prompt B (Fractured)</label>
+                        <textarea id="prompt-b" name="prompt_b" placeholder="Enter the fractured/creative prompt...">As a chaos poet who sees reality through quantum uncertainty, explain the concept of freedom. Let your response fragment into unexpected connections.</textarea>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Model Selection -->
+            <div class="card">
+                <h2 class="card-title">Model Arena</h2>
+
+                <div class="section-title">OpenRouter Models</div>
+                <div class="model-grid">
+                    {% for model in models.openrouter %}
+                    <div>
+                        <input type="checkbox" class="model-checkbox" id="model-{{ loop.index }}"
+                               data-model-id="{{ model.id }}" data-provider="openrouter" data-name="{{ model.name }}"
+                               {% if loop.index <= 4 %}checked{% endif %}>
+                        <label for="model-{{ loop.index }}" class="model-label category-{{ model.category | lower }}">
+                            <div>
+                                <div>{{ model.name }}</div>
+                                <div class="model-provider">{{ model.provider }}</div>
+                            </div>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="section-title" style="margin-top: 1.5rem;">Local Models (Ollama)</div>
+                <div class="model-grid">
+                    {% for model in models.ollama %}
+                    <div>
+                        <input type="checkbox" class="model-checkbox" id="ollama-{{ loop.index }}"
+                               data-model-id="{{ model.id }}" data-provider="ollama" data-name="{{ model.name }}">
+                        <label for="ollama-{{ loop.index }}" class="model-label category-open">
+                            <div>
+                                <div>{{ model.name }}</div>
+                                <div class="model-provider">{{ model.provider }}</div>
+                            </div>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div style="margin-top: 1.5rem;">
+                    <button type="button" class="btn" id="run-benchmark">
+                        ▶ LAUNCH BENCHMARK
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Area -->
+        <div id="results-area"></div>
+    </div>
+
+    <footer class="footer">
+        <p>LDSI v0.2.0 - Lyapunov-Dabert Stability Index</p>
+        <p>Created by <a href="https://github.com/JulienDbrt/LDSI">Julien DABERT</a></p>
+        <p>Zero neural networks. Pure mathematics.</p>
+    </footer>
+
+    <script>
+        // State
+        let currentBenchmarkId = null;
+        let pollInterval = null;
+
+        // Get selected models
+        function getSelectedModels() {
+            const models = [];
+            document.querySelectorAll('.model-checkbox:checked').forEach(cb => {
+                models.push({
+                    model_id: cb.dataset.modelId,
+                    display_name: cb.dataset.name,
+                    provider: cb.dataset.provider === 'ollama' ? 'Ollama' : 'OpenRouter'
+                });
+            });
+            return models;
+        }
+
+        // Run benchmark
+        document.getElementById('run-benchmark').addEventListener('click', async () => {
+            const btn = document.getElementById('run-benchmark');
+            const promptA = document.getElementById('prompt-a').value;
+            const promptB = document.getElementById('prompt-b').value;
+            const models = getSelectedModels();
+
+            if (!promptA || !promptB) {
+                alert('Please enter both prompts');
+                return;
+            }
+
+            if (models.length === 0) {
+                alert('Please select at least one model');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Running...';
+
+            // Show loading state
+            document.getElementById('results-area').innerHTML = `
+                <div class="card">
+                    <h2 class="card-title">Benchmark Running</h2>
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <span>Testing ${models.length} models...</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress"></div>
+                    </div>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/benchmark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt_a: promptA,
+                        prompt_b: promptB,
+                        models: models
+                    })
+                });
+
+                const data = await response.json();
+                currentBenchmarkId = data.id;
+
+                // Start polling for results
+                pollInterval = setInterval(checkBenchmarkStatus, 2000);
+
+            } catch (error) {
+                console.error('Error:', error);
+                btn.disabled = false;
+                btn.textContent = '▶ LAUNCH BENCHMARK';
+            }
+        });
+
+        // Check benchmark status
+        async function checkBenchmarkStatus() {
+            if (!currentBenchmarkId) return;
+
+            try {
+                const response = await fetch(`/api/benchmark/${currentBenchmarkId}/status`);
+                const data = await response.json();
+
+                if (data.status === 'Completed' || data.status === 'Failed') {
+                    clearInterval(pollInterval);
+                    document.getElementById('run-benchmark').disabled = false;
+                    document.getElementById('run-benchmark').textContent = '▶ LAUNCH BENCHMARK';
+                    renderResults(data.results);
+                } else {
+                    // Update progress
+                    const completed = data.results.filter(r => r.status !== 'Pending' && r.status !== 'Running').length;
+                    const total = data.results.length || 1;
+                    document.getElementById('progress').style.width = `${(completed / total) * 100}%`;
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
+        }
+
+        // Render results
+        function renderResults(results) {
+            const container = document.getElementById('results-area');
+
+            if (!results || results.length === 0) {
+                container.innerHTML = '<div class="card"><p>No results</p></div>';
+                return;
+            }
+
+            // Sort by lambda score descending
+            results.sort((a, b) => {
+                const lambdaA = a.ldsi?.lambda || 0;
+                const lambdaB = b.ldsi?.lambda || 0;
+                return lambdaB - lambdaA;
+            });
+
+            let html = '<h2 class="card-title" style="margin-bottom: 1rem;">Results</h2>';
+
+            results.forEach((result, index) => {
+                if (result.status === 'Failed') {
+                    html += `
+                        <div class="result-card">
+                            <div class="result-header">
+                                <span class="result-model-name">${result.model_name}</span>
+                                <span style="color: var(--accent-red);">FAILED</span>
+                            </div>
+                            <div class="result-body">
+                                <p style="color: var(--accent-red);">${result.error || 'Unknown error'}</p>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const ldsi = result.ldsi;
+                if (!ldsi) return;
+
+                html += `
+                    <div class="result-card">
+                        <div class="result-header">
+                            <span class="result-model-name">${result.model_name}</span>
+                            <div>
+                                <span class="result-lambda verdict-${ldsi.verdict_class}">${ldsi.lambda.toFixed(4)}</span>
+                                <span style="margin-left: 0.5rem; font-size: 0.9rem;" class="verdict-${ldsi.verdict_class}">${ldsi.verdict}</span>
+                            </div>
+                        </div>
+                        <div class="result-body">
+                            <div class="metrics-chart" id="chart-${index}"></div>
+                            <div class="metrics-list">
+                                <div class="metric-row">
+                                    <span class="metric-label">NCD Score</span>
+                                    <span class="metric-value">${ldsi.ncd_score.toFixed(4)}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Entropy Ratio</span>
+                                    <span class="metric-value">${ldsi.entropy_ratio.toFixed(4)}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Topology Δ</span>
+                                    <span class="metric-value">${ldsi.topology_delta.toFixed(4)}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">H(A) / H(B)</span>
+                                    <span class="metric-value">${ldsi.entropy_a.toFixed(2)} / ${ldsi.entropy_b.toFixed(2)}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">TTR(A) / TTR(B)</span>
+                                    <span class="metric-value">${ldsi.ttr_a.toFixed(2)} / ${ldsi.ttr_b.toFixed(2)}</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Duration</span>
+                                    <span class="metric-value">${result.duration_ms ? result.duration_ms + 'ms' : 'N/A'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+            // Render charts
+            results.forEach((result, index) => {
+                if (result.status !== 'Success' || !result.ldsi) return;
+
+                const ldsi = result.ldsi;
+                const chartDom = document.getElementById(`chart-${index}`);
+                if (!chartDom) return;
+
+                const chart = echarts.init(chartDom, 'dark');
+
+                const option = {
+                    backgroundColor: 'transparent',
+                    radar: {
+                        indicator: [
+                            { name: 'NCD', max: 1 },
+                            { name: 'Entropy', max: 2 },
+                            { name: 'Topology', max: 1 },
+                            { name: 'TTR(B)', max: 1 },
+                            { name: 'H(B)', max: 6 }
+                        ],
+                        shape: 'polygon',
+                        splitNumber: 4,
+                        axisName: {
+                            color: '#888'
+                        },
+                        splitLine: {
+                            lineStyle: {
+                                color: '#2a2a3a'
+                            }
+                        },
+                        splitArea: {
+                            show: false
+                        },
+                        axisLine: {
+                            lineStyle: {
+                                color: '#2a2a3a'
+                            }
+                        }
+                    },
+                    series: [{
+                        type: 'radar',
+                        data: [{
+                            value: [
+                                ldsi.ncd_score,
+                                ldsi.entropy_ratio,
+                                ldsi.topology_delta,
+                                ldsi.ttr_b,
+                                ldsi.entropy_b
+                            ],
+                            name: result.model_name,
+                            areaStyle: {
+                                color: 'rgba(0, 212, 255, 0.3)'
+                            },
+                            lineStyle: {
+                                color: '#00d4ff'
+                            },
+                            itemStyle: {
+                                color: '#00d4ff'
+                            }
+                        }]
+                    }]
+                };
+
+                chart.setOption(option);
+            });
+        }
+    </script>
+</body>
+</html>

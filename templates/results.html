@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - LDSI</title>
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: #0a0a0f;
+            color: #e0e0e0;
+            padding: 2rem;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        a { color: #00d4ff; }
+        pre { background: #12121a; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⨎ LDSI Results</h1>
+        <p><a href="/">← Back to Dashboard</a></p>
+
+        {% if found %}
+            <h2>Session: {{ session.id }}</h2>
+            <p>Status: {{ session.status | json_encode() }}</p>
+            <p>Created: {{ session.created_at }}</p>
+
+            <h3>Prompts</h3>
+            <p><strong>A:</strong> {{ session.request.prompt_a }}</p>
+            <p><strong>B:</strong> {{ session.request.prompt_b }}</p>
+
+            <h3>Results</h3>
+            <pre>{{ session.results | json_encode() }}</pre>
+        {% else %}
+            <p>Benchmark not found.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
