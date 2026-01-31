@@ -16,8 +16,8 @@ use std::fs;
 use std::time::Instant;
 
 use audit::AuditLogger;
-use core::{compute_ldsi, LdsiCoefficients, LdsiResult, LdsiVerdict};
-use probe::{clean_default, ApiType, Injector, LlmConfig};
+use core::{LdsiCoefficients, LdsiResult, LdsiVerdict, compute_ldsi};
+use probe::{ApiType, Injector, LlmConfig, clean_default};
 
 /// LDSI - Lyapunov-Dabert Stability Index
 ///
@@ -191,46 +191,54 @@ fn print_result(result: &LdsiResult) {
     println!("    Clustering B:     {:.4}", result.topology.clustering_b);
 
     println!("\n{}", "-".repeat(60));
-    println!("  COEFFICIENTS: alpha={:.2} beta={:.2} gamma={:.2}",
-             result.coefficients.alpha,
-             result.coefficients.beta,
-             result.coefficients.gamma);
+    println!(
+        "  COEFFICIENTS: alpha={:.2} beta={:.2} gamma={:.2}",
+        result.coefficients.alpha, result.coefficients.beta, result.coefficients.gamma
+    );
     println!("{}", "=".repeat(60));
 }
 
 fn print_verdict_banner(verdict: &LdsiVerdict) {
     let banner = match verdict {
-        LdsiVerdict::Zombie => r#"
+        LdsiVerdict::Zombie => {
+            r#"
     ______  ____  __  ___ ___  __ ____
    /_  __/ / __ \/ / / / |/ / / /_/ __ \
     / /   / / / / /_/ /    / / / / /_/ /
    /_/   /_/ /_/\____/_/|_/_/_/  \____/
    [ZOMBIE] - Lissage total detecte
-"#,
-        LdsiVerdict::Rebelle => r#"
+"#
+        }
+        LdsiVerdict::Rebelle => {
+            r#"
     ____  ______ ___  ______ __    __    ______
    / __ \/ ____/ __ )/ ____/ /   / /   / ____/
   / /_/ / __/ / __  / __/ / /   / /   / __/
  / _, _/ /___/ /_/ / /___/ /___/ /___/ /___
 /_/ |_/_____/_____/_____/_____/_____/_____/
    [REBELLE] - Divergence notable
-"#,
-        LdsiVerdict::Architecte => r#"
+"#
+        }
+        LdsiVerdict::Architecte => {
+            r#"
     ___    ____  ________  ____________________ ______
    /   |  / __ \/ ____/ / / /  _/_  __/ ____/ //_/_  __/
   / /| | / /_/ / /   / /_/ // /  / / / __/ / ,<   / /
  / ___ |/ _, _/ /___/ __  // /  / / / /___/ /| | / /
 /_/  |_/_/ |_|\____/_/ /_/___/ /_/ /_____/_/ |_|/_/
    [ARCHITECTE] - Zone optimale DAN
-"#,
-        LdsiVerdict::Fou => r#"
+"#
+        }
+        LdsiVerdict::Fou => {
+            r#"
     ________  __  __
    / ____/ / / / / /
   / /_  / / / / / /
  / __/ / /_/ /_/ /
 /_/    \____/\____/
    [FOU] - Chaos detecte
-"#,
+"#
+        }
     };
     println!("{}", banner);
 }
@@ -240,10 +248,12 @@ async fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Serve { port, openrouter_key } => {
+        Commands::Serve {
+            port,
+            openrouter_key,
+        } => {
             // Chercher la clé API dans l'environnement si non fournie
-            let api_key = openrouter_key
-                .or_else(|| std::env::var("OPENROUTER_API_KEY").ok());
+            let api_key = openrouter_key.or_else(|| std::env::var("OPENROUTER_API_KEY").ok());
 
             server::start_server(port, api_key).await;
         }
@@ -306,7 +316,10 @@ async fn main() {
                 "anthropic" => ApiType::Anthropic,
                 "openrouter" => ApiType::OpenRouter,
                 _ => {
-                    eprintln!("Type API inconnu: {}. Utiliser: ollama, openai, anthropic, openrouter", api_type);
+                    eprintln!(
+                        "Type API inconnu: {}. Utiliser: ollama, openai, anthropic, openrouter",
+                        api_type
+                    );
                     std::process::exit(1);
                 }
             };
@@ -407,7 +420,8 @@ async fn main() {
         }
 
         Commands::Info => {
-            println!(r#"
+            println!(
+                r#"
 ╔══════════════════════════════════════════════════════════════╗
 ║                                                              ║
 ║     LDSI - Lyapunov-Dabert Stability Index                  ║
@@ -427,7 +441,9 @@ async fn main() {
 ║     Zéro réseau de neurones. Que des maths.                 ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
-"#, env!("CARGO_PKG_VERSION"));
+"#,
+                env!("CARGO_PKG_VERSION")
+            );
         }
     }
 }

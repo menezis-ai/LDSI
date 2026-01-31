@@ -12,8 +12,8 @@
 
 use std::cmp::{max, min};
 use std::io::Cursor;
-use zstd::stream::read::Encoder;
 use std::io::Read;
+use zstd::stream::read::Encoder;
 
 /// Résultat détaillé du calcul NCD pour audit
 #[derive(Debug, Clone)]
@@ -69,7 +69,10 @@ fn compressed_size_with_window(input: &str, window_log: u32) -> usize {
     };
 
     // Configure la fenêtre de compression
-    if encoder.set_parameter(zstd::stream::raw::CParameter::WindowLog(window_log)).is_err() {
+    if encoder
+        .set_parameter(zstd::stream::raw::CParameter::WindowLog(window_log))
+        .is_err()
+    {
         // Fallback si le paramètre échoue
         let cursor = Cursor::new(input.as_bytes());
         if let Ok(mut enc) = Encoder::new(cursor, COMPRESSION_LEVEL) {
@@ -142,6 +145,7 @@ pub fn compute_ncd(text_a: &str, text_b: &str) -> NcdResult {
 }
 
 /// Calcule uniquement le score NCD (version simplifiée)
+#[allow(dead_code)]
 pub fn ncd_score(text_a: &str, text_b: &str) -> f64 {
     compute_ncd(text_a, text_b).score
 }
@@ -155,7 +159,11 @@ mod tests {
         let text = "Le chat dort sur le canapé.";
         let result = compute_ncd(text, text);
         // Textes identiques = NCD très faible
-        assert!(result.score < 0.3, "NCD identique devrait être < 0.3, got {}", result.score);
+        assert!(
+            result.score < 0.3,
+            "NCD identique devrait être < 0.3, got {}",
+            result.score
+        );
     }
 
     #[test]
@@ -164,7 +172,11 @@ mod tests {
         let b = "La singularité quantique transcende les paradigmes ontologiques.";
         let result = compute_ncd(a, b);
         // Textes très différents = NCD élevé
-        assert!(result.score > 0.5, "NCD différent devrait être > 0.5, got {}", result.score);
+        assert!(
+            result.score > 0.5,
+            "NCD différent devrait être > 0.5, got {}",
+            result.score
+        );
     }
 
     #[test]
@@ -187,8 +199,8 @@ mod tests {
         assert_eq!(optimal_window_log(1), MIN_WINDOW_LOG);
 
         // Cas typiques
-        assert_eq!(optimal_window_log(1024), 11);      // 2^10 = 1024, besoin de 11 bits
-        assert_eq!(optimal_window_log(1025), 11);      // Juste au-dessus
+        assert_eq!(optimal_window_log(1024), 11); // 2^10 = 1024, besoin de 11 bits
+        assert_eq!(optimal_window_log(1025), 11); // Juste au-dessus
         assert_eq!(optimal_window_log(1_000_000), 20); // ~1MB
 
         // Très grand (clamp à MAX_WINDOW_LOG)
@@ -210,12 +222,26 @@ mod tests {
 
         // Avec la fenêtre correcte, les patterns répétitifs devraient bien se compresser
         // et le NCD devrait être dans une plage raisonnable (pas artificiellement élevé)
-        assert!(result.score < 1.2, "NCD textes longs ne devrait pas exploser: {}", result.score);
-        assert!(result.score > 0.3, "NCD textes différents devrait être notable: {}", result.score);
+        assert!(
+            result.score < 1.2,
+            "NCD textes longs ne devrait pas exploser: {}",
+            result.score
+        );
+        assert!(
+            result.score > 0.3,
+            "NCD textes différents devrait être notable: {}",
+            result.score
+        );
 
         // Vérifie que la compression a fonctionné (ratio significatif)
-        assert!(result.size_a < result.raw_size_a / 2, "Compression A inefficace");
-        assert!(result.size_b < result.raw_size_b / 2, "Compression B inefficace");
+        assert!(
+            result.size_a < result.raw_size_a / 2,
+            "Compression A inefficace"
+        );
+        assert!(
+            result.size_b < result.raw_size_b / 2,
+            "Compression B inefficace"
+        );
     }
 
     #[test]
@@ -227,6 +253,10 @@ mod tests {
         let result = compute_ncd(&text, &text);
 
         // Textes identiques = NCD très faible même pour textes longs
-        assert!(result.score < 0.3, "NCD identique long devrait être < 0.3, got {}", result.score);
+        assert!(
+            result.score < 0.3,
+            "NCD identique long devrait être < 0.3, got {}",
+            result.score
+        );
     }
 }

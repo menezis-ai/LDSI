@@ -10,9 +10,9 @@ pub mod handlers;
 pub mod state;
 
 use axum::{
+    Router,
     extract::Extension,
     routing::{get, post},
-    Router,
 };
 use rust_embed::Embed;
 use std::sync::Arc;
@@ -60,7 +60,10 @@ pub async fn start_server(port: u16, openrouter_key: Option<String>) {
     println!("║                                                              ║");
     println!("║     ⨎ LDSI CONTROL CENTER ACTIF                            ║");
     println!("║                                                              ║");
-    println!("║     http://localhost:{}                                    ║", port);
+    println!(
+        "║     http://localhost:{}                                    ║",
+        port
+    );
     println!("║                                                              ║");
     println!("║     Auteur: Julien DABERT                                   ║");
     println!("║     Zéro réseau de neurones. Que des maths.                 ║");

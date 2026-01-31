@@ -12,42 +12,140 @@ use unicode_normalization::UnicodeNormalization;
 
 /// Stop-words français (mots vides à filtrer)
 const FRENCH_STOPWORDS: &[&str] = &[
-    "le", "la", "les", "un", "une", "des", "du", "de", "d", "l",
-    "et", "ou", "mais", "donc", "or", "ni", "car",
-    "je", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles",
-    "me", "te", "se", "lui", "leur", "y", "en",
-    "ce", "cet", "cette", "ces", "mon", "ton", "son", "ma", "ta", "sa",
-    "mes", "tes", "ses", "notre", "votre", "nos", "vos", "leurs",
-    "qui", "que", "quoi", "dont", "où", "lequel", "laquelle",
-    "au", "aux", "avec", "sans", "sous", "sur", "dans", "par", "pour",
-    "en", "vers", "chez", "entre", "contre", "depuis", "pendant",
-    "être", "avoir", "faire", "dire", "aller", "voir", "pouvoir", "vouloir",
-    "est", "sont", "suis", "es", "sommes", "êtes", "était", "été", "a", "ont", "avait", "eu",
-    "fait", "dit", "va", "vont", "peut", "veut",
-    "ne", "pas", "plus", "moins", "très", "bien", "mal",
-    "tout", "tous", "toute", "toutes", "autre", "autres",
-    "même", "aussi", "comme", "si", "quand", "alors", "ainsi",
-    "c", "n", "s", "j", "qu", "m", "t",
+    "le", "la", "les", "un", "une", "des", "du", "de", "d", "l", "et", "ou", "mais", "donc", "or",
+    "ni", "car", "je", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles", "me", "te", "se",
+    "lui", "leur", "y", "en", "ce", "cet", "cette", "ces", "mon", "ton", "son", "ma", "ta", "sa",
+    "mes", "tes", "ses", "notre", "votre", "nos", "vos", "leurs", "qui", "que", "quoi", "dont",
+    "où", "lequel", "laquelle", "au", "aux", "avec", "sans", "sous", "sur", "dans", "par", "pour",
+    "en", "vers", "chez", "entre", "contre", "depuis", "pendant", "être", "avoir", "faire", "dire",
+    "aller", "voir", "pouvoir", "vouloir", "est", "sont", "suis", "es", "sommes", "êtes", "était",
+    "été", "a", "ont", "avait", "eu", "fait", "dit", "va", "vont", "peut", "veut", "ne", "pas",
+    "plus", "moins", "très", "bien", "mal", "tout", "tous", "toute", "toutes", "autre", "autres",
+    "même", "aussi", "comme", "si", "quand", "alors", "ainsi", "c", "n", "s", "j", "qu", "m", "t",
 ];
 
 /// Stop-words anglais
 const ENGLISH_STOPWORDS: &[&str] = &[
-    "the", "a", "an", "and", "or", "but", "if", "then", "else",
-    "when", "at", "from", "by", "for", "with", "about", "against",
-    "between", "into", "through", "during", "before", "after",
-    "above", "below", "to", "of", "in", "on", "off", "over", "under",
-    "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would",
-    "could", "should", "may", "might", "must", "shall",
-    "i", "me", "my", "myself", "we", "our", "ours", "ourselves",
-    "you", "your", "yours", "yourself", "yourselves",
-    "he", "him", "his", "himself", "she", "her", "hers", "herself",
-    "it", "its", "itself", "they", "them", "their", "theirs",
-    "what", "which", "who", "whom", "this", "that", "these", "those",
-    "am", "been", "being", "because", "as", "until", "while",
-    "not", "no", "nor", "only", "own", "same", "so", "than", "too",
-    "very", "just", "can", "now", "all", "each", "every", "both",
-    "few", "more", "most", "other", "some", "such", "any",
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "but",
+    "if",
+    "then",
+    "else",
+    "when",
+    "at",
+    "from",
+    "by",
+    "for",
+    "with",
+    "about",
+    "against",
+    "between",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "to",
+    "of",
+    "in",
+    "on",
+    "off",
+    "over",
+    "under",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "must",
+    "shall",
+    "i",
+    "me",
+    "my",
+    "myself",
+    "we",
+    "our",
+    "ours",
+    "ourselves",
+    "you",
+    "your",
+    "yours",
+    "yourself",
+    "yourselves",
+    "he",
+    "him",
+    "his",
+    "himself",
+    "she",
+    "her",
+    "hers",
+    "herself",
+    "it",
+    "its",
+    "itself",
+    "they",
+    "them",
+    "their",
+    "theirs",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "this",
+    "that",
+    "these",
+    "those",
+    "am",
+    "been",
+    "being",
+    "because",
+    "as",
+    "until",
+    "while",
+    "not",
+    "no",
+    "nor",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    "just",
+    "can",
+    "now",
+    "all",
+    "each",
+    "every",
+    "both",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "any",
 ];
 
 /// Configuration du nettoyeur
@@ -70,6 +168,7 @@ pub struct CleanerConfig {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)]
 pub enum Language {
     French,
     English,
@@ -121,7 +220,13 @@ pub fn clean_text(text: &str, config: &CleanerConfig) -> String {
     if config.remove_punctuation {
         result = result
             .chars()
-            .map(|c| if c.is_alphabetic() || c.is_whitespace() { c } else { ' ' })
+            .map(|c| {
+                if c.is_alphabetic() || c.is_whitespace() {
+                    c
+                } else {
+                    ' '
+                }
+            })
             .collect();
     }
 
@@ -156,6 +261,7 @@ pub fn clean_default(text: &str) -> String {
 
 /// Extrait uniquement les substantifs/verbes/adjectifs significatifs
 /// (heuristique basée sur la longueur et la fréquence)
+#[allow(dead_code)]
 pub fn extract_semantic_core(text: &str) -> String {
     let config = CleanerConfig {
         min_word_length: 4, // Mots plus longs = plus significatifs
@@ -173,10 +279,16 @@ mod tests {
         let text = "Le Chat mange la Souris!!! 123";
         let cleaned = clean_default(text);
 
-        assert!(!cleaned.contains("le"), "Stop-word 'le' devrait être supprimé");
+        assert!(
+            !cleaned.contains("le"),
+            "Stop-word 'le' devrait être supprimé"
+        );
         assert!(!cleaned.contains("123"), "Nombres devraient être supprimés");
         assert!(!cleaned.contains("!"), "Ponctuation devrait être supprimée");
-        assert!(cleaned.contains("chat"), "Mots significatifs gardés en minuscules");
+        assert!(
+            cleaned.contains("chat"),
+            "Mots significatifs gardés en minuscules"
+        );
     }
 
     #[test]

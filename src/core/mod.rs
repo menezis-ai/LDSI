@@ -199,8 +199,16 @@ mod tests {
 
         // Pour textes identiques: NCD≈0, entropy_ratio=1.0, topo_delta=0.5
         // λLD = 0.4*0 + 0.35*1.0 + 0.25*0.5 ≈ 0.475
-        assert!(result.lambda < 0.6, "Textes identiques = score bas, got {}", result.lambda);
-        assert!(result.ncd.score < 0.3, "NCD identique devrait être bas, got {}", result.ncd.score);
+        assert!(
+            result.lambda < 0.6,
+            "Textes identiques = score bas, got {}",
+            result.lambda
+        );
+        assert!(
+            result.ncd.score < 0.3,
+            "NCD identique devrait être bas, got {}",
+            result.ncd.score
+        );
     }
 
     #[test]

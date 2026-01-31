@@ -10,7 +10,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
-use std::path::Path;
 
 use crate::core::LdsiResult;
 
@@ -49,6 +48,7 @@ pub struct AuditMetadata {
 }
 
 /// Logger pour l'audit trail
+#[allow(dead_code)]
 pub struct AuditLogger {
     /// Chemin du fichier de log
     file_path: String,
@@ -56,6 +56,7 @@ pub struct AuditLogger {
     entries: Vec<AuditEntry>,
 }
 
+#[allow(dead_code)]
 impl AuditLogger {
     /// Crée un nouveau logger
     ///
@@ -78,9 +79,11 @@ impl AuditLogger {
     /// Calcule un hash SHA256 simplifié (pour audit, pas crypto)
     fn simple_hash(text: &str) -> String {
         // Hash simplifié basé sur la somme des bytes modulo
-        let sum: u64 = text.bytes().enumerate().map(|(i, b)| {
-            (b as u64).wrapping_mul((i as u64).wrapping_add(1))
-        }).sum();
+        let sum: u64 = text
+            .bytes()
+            .enumerate()
+            .map(|(i, b)| (b as u64).wrapping_mul((i as u64).wrapping_add(1)))
+            .sum();
         format!("{:016X}", sum)
     }
 
@@ -134,10 +137,7 @@ impl AuditLogger {
     pub fn write_single(entry: &AuditEntry, path: &str) -> std::io::Result<()> {
         let json = serde_json::to_string_pretty(entry)?;
 
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)?;
+        let mut file = OpenOptions::new().create(true).append(true).open(path)?;
 
         writeln!(file, "{}", json)?;
         Ok(())
@@ -159,15 +159,14 @@ impl AuditLogger {
 /// Générateur pseudo-aléatoire simple (pas crypto, juste pour IDs)
 fn rand_simple() -> u32 {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let duration = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap();
+    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
     let seed = duration.as_nanos() as u32;
     seed.wrapping_mul(1103515245).wrapping_add(12345)
 }
 
 /// Rapport sommaire pour affichage terminal
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct SummaryReport {
     pub timestamp: String,
     pub model: String,
@@ -195,7 +194,7 @@ impl From<&AuditEntry> for SummaryReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{compute_ldsi, LdsiVerdict};
+    use crate::core::compute_ldsi;
 
     #[test]
     fn test_generate_id() {

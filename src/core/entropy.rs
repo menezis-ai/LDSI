@@ -46,11 +46,7 @@ fn shannon_entropy(frequencies: &HashMap<String, usize>, total: usize) -> f64 {
         .values()
         .map(|&count| {
             let p = count as f64 / total_f64;
-            if p > 0.0 {
-                -p * p.log2()
-            } else {
-                0.0
-            }
+            if p > 0.0 { -p * p.log2() } else { 0.0 }
         })
         .sum()
 }
@@ -121,6 +117,7 @@ pub fn compute_entropy(text: &str) -> EntropyResult {
 ///
 /// # Returns
 /// Ratio H(B) / H(A) - > 1.0 signifie gain d'information
+#[allow(dead_code)]
 pub fn entropy_ratio(text_a: &str, text_b: &str) -> f64 {
     let h_a = compute_entropy(text_a).shannon;
     let h_b = compute_entropy(text_b).shannon;
@@ -164,15 +161,25 @@ mod tests {
         // 4 mots uniques = entropie maximale pour 4 symboles = 2 bits
         let text = "alpha beta gamma delta";
         let result = compute_entropy(text);
-        assert!((result.shannon - 2.0).abs() < 0.01, "Entropie uniforme 4 symboles = 2 bits, got {}", result.shannon);
-        assert_eq!(result.ttr, 1.0, "TTR devrait être 1.0 pour mots tous uniques");
+        assert!(
+            (result.shannon - 2.0).abs() < 0.01,
+            "Entropie uniforme 4 symboles = 2 bits, got {}",
+            result.shannon
+        );
+        assert_eq!(
+            result.ttr, 1.0,
+            "TTR devrait être 1.0 pour mots tous uniques"
+        );
     }
 
     #[test]
     fn test_repetitive_text() {
         let text = "le le le le le le le le";
         let result = compute_entropy(text);
-        assert!(result.shannon < 0.1, "Texte répétitif = entropie quasi-nulle");
+        assert!(
+            result.shannon < 0.1,
+            "Texte répétitif = entropie quasi-nulle"
+        );
         assert!(result.ttr < 0.2, "TTR très faible pour répétition");
     }
 

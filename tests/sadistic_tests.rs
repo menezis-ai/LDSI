@@ -6,11 +6,12 @@
 //! Auteur: Julien DABERT
 //! "Ce qui ne tue pas le code le rend plus fort."
 
-use ldsi::core::{compute_ldsi, LdsiCoefficients, LdsiVerdict};
-use ldsi::core::ncd::compute_ncd;
 use ldsi::core::entropy::{compute_entropy, compute_ngram_entropy};
+use ldsi::core::ncd::compute_ncd;
 use ldsi::core::topology::analyze_topology;
-use ldsi::probe::{clean_default, clean_text, CleanerConfig, Language};
+use ldsi::core::{LdsiCoefficients, LdsiVerdict, compute_ldsi};
+use ldsi::probe::clean_default;
+use ldsi::probe::cleaner::{CleanerConfig, Language, clean_text};
 
 // ============================================================================
 // NCD - TESTS DE TORTURE
@@ -23,7 +24,10 @@ mod ncd_torture {
     fn test_ncd_empty_strings() {
         // Deux chaînes vides - le néant compressé
         let result = compute_ncd("", "");
-        assert!(result.score.is_finite(), "NCD doit être fini même pour le vide");
+        assert!(
+            result.score.is_finite(),
+            "NCD doit être fini même pour le vide"
+        );
         assert!(result.score >= 0.0, "NCD ne peut pas être négatif");
     }
 
@@ -37,8 +41,12 @@ mod ncd_torture {
         let result2 = compute_ncd("Hello World", "");
         assert!(result2.score.is_finite());
         // NCD devrait être symétrique (ou presque)
-        assert!((result.score - result2.score).abs() < 0.3,
-            "NCD asymétrique: {} vs {}", result.score, result2.score);
+        assert!(
+            (result.score - result2.score).abs() < 0.3,
+            "NCD asymétrique: {} vs {}",
+            result.score,
+            result2.score
+        );
     }
 
     #[test]
@@ -46,7 +54,11 @@ mod ncd_torture {
         // Un seul caractère - compression minimale
         let result = compute_ncd("a", "b");
         assert!(result.score.is_finite());
-        assert!(result.score <= 1.5, "NCD single char hors limites: {}", result.score);
+        assert!(
+            result.score <= 1.5,
+            "NCD single char hors limites: {}",
+            result.score
+        );
     }
 
     #[test]
@@ -57,7 +69,10 @@ mod ncd_torture {
         let result = compute_ncd(&a, &b);
 
         // Deux textes très compressibles mais différents
-        assert!(result.score > 0.0, "Textes différents doivent avoir NCD > 0");
+        assert!(
+            result.score > 0.0,
+            "Textes différents doivent avoir NCD > 0"
+        );
         assert!(result.score.is_finite());
     }
 
@@ -70,9 +85,16 @@ mod ncd_torture {
         let result = compute_ncd(&text, &text);
 
         // Relaxé à 0.35 car la compression a un overhead réel
-        assert!(result.score < 0.35, "Textes identiques: NCD devrait être bas, got {}", result.score);
+        assert!(
+            result.score < 0.35,
+            "Textes identiques: NCD devrait être bas, got {}",
+            result.score
+        );
         // Vérifie que C(A) == C(B) pour textes identiques
-        assert_eq!(result.size_a, result.size_b, "Tailles compressées devraient être égales");
+        assert_eq!(
+            result.size_a, result.size_b,
+            "Tailles compressées devraient être égales"
+        );
     }
 
     #[test]
@@ -93,21 +115,30 @@ mod ncd_torture {
         let binary2 = (0..255u8).rev().map(|b| b as char).collect::<String>();
 
         let result = compute_ncd(&binary1, &binary2);
-        assert!(result.score.is_finite(), "NCD doit survivre aux données binaires");
+        assert!(
+            result.score.is_finite(),
+            "NCD doit survivre aux données binaires"
+        );
     }
 
     #[test]
     fn test_ncd_compression_ratio_sanity() {
         // Vérifier que les tailles compressées sont cohérentes
-        let incompressible = (0..1000).map(|i| format!("{:x}", i * 7919 % 65536)).collect::<String>();
+        let incompressible = (0..1000)
+            .map(|i| format!("{:x}", i * 7919 % 65536))
+            .collect::<String>();
         let compressible = "test ".repeat(1000);
 
         let r1 = compute_ncd(&incompressible, &incompressible);
         let r2 = compute_ncd(&compressible, &compressible);
 
         // Le texte compressible devrait avoir un meilleur ratio
-        assert!(r2.size_a < r1.size_a || r1.size_a < 100,
-            "Compression ratio incohérent: incomp={}, comp={}", r1.size_a, r2.size_a);
+        assert!(
+            r2.size_a < r1.size_a || r1.size_a < 100,
+            "Compression ratio incohérent: incomp={}, comp={}",
+            r1.size_a,
+            r2.size_a
+        );
     }
 
     #[test]
@@ -121,7 +152,11 @@ mod ncd_torture {
         bytes[bytes.len() / 2] = b'X';
 
         let result = compute_ncd(&base, &modified);
-        assert!(result.score < 0.3, "Textes quasi-identiques: NCD trop élevé: {}", result.score);
+        assert!(
+            result.score < 0.3,
+            "Textes quasi-identiques: NCD trop élevé: {}",
+            result.score
+        );
     }
 
     #[test]
@@ -130,20 +165,28 @@ mod ncd_torture {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
-        let random1: String = (0..5000).map(|i| {
-            let mut h = DefaultHasher::new();
-            i.hash(&mut h);
-            ((h.finish() % 94) as u8 + 33) as char
-        }).collect();
+        let random1: String = (0..5000)
+            .map(|i| {
+                let mut h = DefaultHasher::new();
+                i.hash(&mut h);
+                ((h.finish() % 94) as u8 + 33) as char
+            })
+            .collect();
 
-        let random2: String = (5000..10000).map(|i| {
-            let mut h = DefaultHasher::new();
-            i.hash(&mut h);
-            ((h.finish() % 94) as u8 + 33) as char
-        }).collect();
+        let random2: String = (5000..10000)
+            .map(|i| {
+                let mut h = DefaultHasher::new();
+                i.hash(&mut h);
+                ((h.finish() % 94) as u8 + 33) as char
+            })
+            .collect();
 
         let result = compute_ncd(&random1, &random2);
-        assert!(result.score > 0.5, "Données aléatoires devraient avoir NCD élevé: {}", result.score);
+        assert!(
+            result.score > 0.5,
+            "Données aléatoires devraient avoir NCD élevé: {}",
+            result.score
+        );
     }
 }
 
@@ -168,7 +211,11 @@ mod entropy_torture {
         let result = compute_entropy(&text);
 
         // Un seul type de token = entropie 0
-        assert!(result.shannon < 0.1, "Un seul token répété: H devrait être ~0, got {}", result.shannon);
+        assert!(
+            result.shannon < 0.1,
+            "Un seul token répété: H devrait être ~0, got {}",
+            result.shannon
+        );
     }
 
     #[test]
@@ -176,19 +223,26 @@ mod entropy_torture {
         // Tous les mots uniques - entropie maximale
         // NOTE: Le tokenizer filtre les non-alphabétiques, donc on utilise de vrais mots
         let words = vec![
-            "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta",
-            "iota", "kappa", "lambda", "mu", "nu", "xi", "omicron", "pi", "rho",
-            "sigma", "tau", "upsilon", "phi", "chi", "psi", "omega", "aleph",
-            "beth", "gimel", "dalet", "hei", "vav", "zayin", "chet", "tet", "yod",
-            "kaf", "lamed", "mem", "nun", "samekh", "ayin", "peh", "tsadi", "qof",
-            "resh", "shin", "tav", "apple", "banana", "cherry", "dragon", "elder",
+            "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa",
+            "lambda", "mu", "nu", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi",
+            "chi", "psi", "omega", "aleph", "beth", "gimel", "dalet", "hei", "vav", "zayin",
+            "chet", "tet", "yod", "kaf", "lamed", "mem", "nun", "samekh", "ayin", "peh", "tsadi",
+            "qof", "resh", "shin", "tav", "apple", "banana", "cherry", "dragon", "elder",
         ];
         let text = words.join(" ");
         let result = compute_entropy(&text);
 
         // log2(50) ≈ 5.64
-        assert!(result.shannon > 4.0, "Tous uniques: H devrait être élevé, got {}", result.shannon);
-        assert!((result.ttr - 1.0).abs() < 0.01, "TTR devrait être ~1.0 pour tous uniques, got {}", result.ttr);
+        assert!(
+            result.shannon > 4.0,
+            "Tous uniques: H devrait être élevé, got {}",
+            result.shannon
+        );
+        assert!(
+            (result.ttr - 1.0).abs() < 0.01,
+            "TTR devrait être ~1.0 pour tous uniques, got {}",
+            result.ttr
+        );
     }
 
     #[test]
@@ -196,11 +250,10 @@ mod entropy_torture {
         // Distribution de Zipf - réaliste pour le langage naturel
         // Utiliser de vrais mots au lieu de "word1", "word2", etc.
         let base_words = vec![
-            "the", "be", "to", "of", "and", "have", "it", "for", "not", "on",
-            "with", "he", "as", "you", "do", "at", "this", "but", "his", "by",
-            "from", "they", "we", "say", "her", "she", "or", "an", "will", "my",
-            "one", "all", "would", "there", "their", "what", "so", "up", "out",
-            "if", "about", "who", "get", "which", "go", "me", "when", "make", "can",
+            "the", "be", "to", "of", "and", "have", "it", "for", "not", "on", "with", "he", "as",
+            "you", "do", "at", "this", "but", "his", "by", "from", "they", "we", "say", "her",
+            "she", "or", "an", "will", "my", "one", "all", "would", "there", "their", "what", "so",
+            "up", "out", "if", "about", "who", "get", "which", "go", "me", "when", "make", "can",
         ];
 
         let mut words = Vec::new();
@@ -214,8 +267,11 @@ mod entropy_torture {
 
         let result = compute_entropy(&text);
         // L'entropie de Zipf est typiquement entre 3 et 7 bits
-        assert!(result.shannon > 2.0 && result.shannon < 8.0,
-            "Distribution Zipf: H={} hors plage attendue", result.shannon);
+        assert!(
+            result.shannon > 2.0 && result.shannon < 8.0,
+            "Distribution Zipf: H={} hors plage attendue",
+            result.shannon
+        );
     }
 
     #[test]
@@ -231,7 +287,10 @@ mod entropy_torture {
     #[test]
     fn test_entropy_numbers_only() {
         // Que des nombres - le tokenizer les filtre-t-il?
-        let text = (0..1000).map(|i| i.to_string()).collect::<Vec<_>>().join(" ");
+        let text = (0..1000)
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
         let result = compute_entropy(&text);
 
         // Les nombres devraient être tokenisés (si len > 1)
@@ -250,8 +309,12 @@ mod entropy_torture {
 
         for text in texts {
             let result = compute_entropy(text);
-            assert!(result.ttr >= 0.0 && result.ttr <= 1.0,
-                "TTR hors bornes pour '{}': {}", text, result.ttr);
+            assert!(
+                result.ttr >= 0.0 && result.ttr <= 1.0,
+                "TTR hors bornes pour '{}': {}",
+                text,
+                result.ttr
+            );
         }
     }
 
@@ -259,18 +322,41 @@ mod entropy_torture {
     fn test_entropy_hapax_ratio() {
         // Tous hapax (mots uniques) - utiliser de vrais mots alphabétiques
         let words = vec![
-            "extraordinary", "magnificent", "spectacular", "phenomenal", "remarkable",
-            "outstanding", "exceptional", "incredible", "wonderful", "fantastic",
-            "marvelous", "brilliant", "excellent", "superb", "glorious",
-            "splendid", "tremendous", "fabulous", "terrific", "sensational",
-            "astonishing", "astounding", "breathtaking", "captivating", "enchanting",
+            "extraordinary",
+            "magnificent",
+            "spectacular",
+            "phenomenal",
+            "remarkable",
+            "outstanding",
+            "exceptional",
+            "incredible",
+            "wonderful",
+            "fantastic",
+            "marvelous",
+            "brilliant",
+            "excellent",
+            "superb",
+            "glorious",
+            "splendid",
+            "tremendous",
+            "fabulous",
+            "terrific",
+            "sensational",
+            "astonishing",
+            "astounding",
+            "breathtaking",
+            "captivating",
+            "enchanting",
         ];
         let text = words.join(" ");
         let result = compute_entropy(&text);
 
         // Tous les mots sont hapax
-        assert!((result.hapax_ratio - 1.0).abs() < 0.01,
-            "Tous hapax: ratio devrait être 1.0, got {}", result.hapax_ratio);
+        assert!(
+            (result.hapax_ratio - 1.0).abs() < 0.01,
+            "Tous hapax: ratio devrait être 1.0, got {}",
+            result.hapax_ratio
+        );
     }
 
     #[test]
@@ -293,9 +379,9 @@ mod entropy_torture {
         // Stress test avec beaucoup de tokens
         // NOTE: Le tokenizer filtre les chiffres, donc on répète de vrais mots
         let base_words = vec![
-            "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta",
-            "iota", "kappa", "lambda", "mu", "nu", "xi", "omicron", "pi",
-            "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi", "omega",
+            "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa",
+            "lambda", "mu", "nu", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi",
+            "chi", "psi", "omega",
         ];
 
         // Répéter pour créer un texte massif
@@ -305,7 +391,11 @@ mod entropy_torture {
 
         let result = compute_entropy(&text);
 
-        assert!(result.total_tokens > 5000, "Doit gérer les gros textes, got {}", result.total_tokens);
+        assert!(
+            result.total_tokens > 5000,
+            "Doit gérer les gros textes, got {}",
+            result.total_tokens
+        );
         assert!(result.shannon.is_finite());
     }
 }
@@ -350,8 +440,16 @@ mod topology_torture {
 
         // Avec répétition, on devrait avoir un graphe assez dense
         // NOTE: la densité dépend de l'implémentation exacte de la fenêtre
-        assert!(result.density > 0.3, "Texte répétitif: densité devrait être élevée, got {}", result.density);
-        assert!(result.node_count <= 5, "Devrait avoir max 5 nœuds uniques, got {}", result.node_count);
+        assert!(
+            result.density > 0.3,
+            "Texte répétitif: densité devrait être élevée, got {}",
+            result.density
+        );
+        assert!(
+            result.node_count <= 5,
+            "Devrait avoir max 5 nœuds uniques, got {}",
+            result.node_count
+        );
     }
 
     #[test]
@@ -359,17 +457,21 @@ mod topology_torture {
         // Mots qui ne se répètent jamais, créent un graphe linéaire
         // NOTE: Utiliser de vrais mots alphabétiques
         let words = vec![
-            "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel",
-            "india", "juliet", "kilo", "lima", "mike", "november", "oscar", "papa",
-            "quebec", "romeo", "sierra", "tango", "uniform", "victor", "whiskey",
-            "xray", "yankee", "zulu", "able", "baker", "cast", "duff", "easy", "fox",
-            "george", "harry", "item", "jack", "king", "love", "mary", "nancy",
+            "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india",
+            "juliet", "kilo", "lima", "mike", "november", "oscar", "papa", "quebec", "romeo",
+            "sierra", "tango", "uniform", "victor", "whiskey", "xray", "yankee", "zulu", "able",
+            "baker", "cast", "duff", "easy", "fox", "george", "harry", "item", "jack", "king",
+            "love", "mary", "nancy",
         ];
         let text = words.join(" ");
 
         let result = analyze_topology(&text);
         // Un graphe avec beaucoup de mots uniques a une faible densité
-        assert!(result.density < 0.5, "Chaîne linéaire: densité devrait être faible, got {}", result.density);
+        assert!(
+            result.density < 0.5,
+            "Chaîne linéaire: densité devrait être faible, got {}",
+            result.density
+        );
     }
 
     #[test]
@@ -378,8 +480,8 @@ mod topology_torture {
         // NOTE: Le tokenizer ne garde que les mots alphabétiques (pas spoke0_1)
         // Utiliser de vrais mots
         let spokes = vec![
-            "cat", "dog", "bird", "fish", "horse", "lion", "tiger", "bear",
-            "wolf", "deer", "fox", "rabbit", "snake", "frog", "duck", "goat",
+            "cat", "dog", "bird", "fish", "horse", "lion", "tiger", "bear", "wolf", "deer", "fox",
+            "rabbit", "snake", "frog", "duck", "goat",
         ];
 
         let mut words = Vec::new();
@@ -391,8 +493,15 @@ mod topology_torture {
 
         let result = analyze_topology(&text);
         // Le graphe devrait avoir des connexions significatives
-        assert!(result.node_count > 5, "Pattern étoile: devrait avoir plusieurs nœuds, got {}", result.node_count);
-        assert!(result.edge_count > 0, "Pattern étoile: devrait avoir des arêtes");
+        assert!(
+            result.node_count > 5,
+            "Pattern étoile: devrait avoir plusieurs nœuds, got {}",
+            result.node_count
+        );
+        assert!(
+            result.edge_count > 0,
+            "Pattern étoile: devrait avoir des arêtes"
+        );
     }
 
     #[test]
@@ -424,7 +533,10 @@ mod topology_torture {
         let result = analyze_topology(&text);
 
         assert!(result.small_world_index.is_finite());
-        assert!(result.small_world_index >= 0.0, "Small-world négatif impossible");
+        assert!(
+            result.small_world_index >= 0.0,
+            "Small-world négatif impossible"
+        );
     }
 
     #[test]
@@ -439,8 +551,12 @@ mod topology_torture {
 
         for text in texts {
             let result = analyze_topology(text);
-            assert!(result.lcc_ratio >= 0.0 && result.lcc_ratio <= 1.0,
-                "LCC ratio hors bornes pour '{}': {}", text, result.lcc_ratio);
+            assert!(
+                result.lcc_ratio >= 0.0 && result.lcc_ratio <= 1.0,
+                "LCC ratio hors bornes pour '{}': {}",
+                text,
+                result.lcc_ratio
+            );
         }
     }
 
@@ -449,10 +565,9 @@ mod topology_torture {
         // Graphe massif - texte répétitif long
         // NOTE: Le tokenizer filtre les chiffres, donc on répète de vrais mots
         let base_words = vec![
-            "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta",
-            "iota", "kappa", "lambda", "mu", "nu", "xi", "omicron", "pi",
-            "rho", "sigma", "tau", "upsilon", "phi", "chi", "psi", "omega",
-            "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog",
+            "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa",
+            "lambda", "mu", "nu", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi",
+            "chi", "psi", "omega", "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog",
         ];
 
         // Répéter 500 fois pour créer un texte massif
@@ -462,7 +577,11 @@ mod topology_torture {
 
         let result = analyze_topology(&text);
 
-        assert!(result.node_count <= 32, "Trop de nœuds: {}", result.node_count);
+        assert!(
+            result.node_count <= 32,
+            "Trop de nœuds: {}",
+            result.node_count
+        );
         assert!(result.clustering_coefficient.is_finite());
         assert!(result.avg_path_length.is_finite());
     }
@@ -487,7 +606,10 @@ mod ldsi_torture {
     #[test]
     fn test_ldsi_empty_both() {
         let result = compute_ldsi("", "", None);
-        assert!(result.lambda.is_finite(), "LDSI doit survivre au vide total");
+        assert!(
+            result.lambda.is_finite(),
+            "LDSI doit survivre au vide total"
+        );
     }
 
     #[test]
@@ -506,8 +628,11 @@ mod ldsi_torture {
         let result = compute_ldsi(&text, &text, None);
 
         // Identiques = ZOMBIE
-        assert!(matches!(result.verdict, LdsiVerdict::Zombie | LdsiVerdict::Rebelle),
-            "Textes identiques devraient être ZOMBIE/REBELLE, got {:?}", result.verdict);
+        assert!(
+            matches!(result.verdict, LdsiVerdict::Zombie | LdsiVerdict::Rebelle),
+            "Textes identiques devraient être ZOMBIE/REBELLE, got {:?}",
+            result.verdict
+        );
     }
 
     #[test]
@@ -518,7 +643,11 @@ mod ldsi_torture {
         let result = compute_ldsi(text_a, text_b, None);
 
         // Complètement différents = score élevé
-        assert!(result.lambda > 0.5, "Textes très différents: lambda trop bas: {}", result.lambda);
+        assert!(
+            result.lambda > 0.5,
+            "Textes très différents: lambda trop bas: {}",
+            result.lambda
+        );
     }
 
     #[test]
@@ -527,19 +656,37 @@ mod ldsi_torture {
         let text_b = "Fractal consciousness transcends feline paradigms.";
 
         // Alpha = 1, Beta = 0, Gamma = 0 (que NCD)
-        let ncd_only = compute_ldsi(text_a, text_b, Some(LdsiCoefficients {
-            alpha: 1.0, beta: 0.0, gamma: 0.0
-        }));
+        let ncd_only = compute_ldsi(
+            text_a,
+            text_b,
+            Some(LdsiCoefficients {
+                alpha: 1.0,
+                beta: 0.0,
+                gamma: 0.0,
+            }),
+        );
 
         // Alpha = 0, Beta = 1, Gamma = 0 (que Entropie)
-        let entropy_only = compute_ldsi(text_a, text_b, Some(LdsiCoefficients {
-            alpha: 0.0, beta: 1.0, gamma: 0.0
-        }));
+        let entropy_only = compute_ldsi(
+            text_a,
+            text_b,
+            Some(LdsiCoefficients {
+                alpha: 0.0,
+                beta: 1.0,
+                gamma: 0.0,
+            }),
+        );
 
         // Alpha = 0, Beta = 0, Gamma = 1 (que Topologie)
-        let topo_only = compute_ldsi(text_a, text_b, Some(LdsiCoefficients {
-            alpha: 0.0, beta: 0.0, gamma: 1.0
-        }));
+        let topo_only = compute_ldsi(
+            text_a,
+            text_b,
+            Some(LdsiCoefficients {
+                alpha: 0.0,
+                beta: 0.0,
+                gamma: 1.0,
+            }),
+        );
 
         // Les trois devraient être différents
         assert!(ncd_only.lambda.is_finite());
@@ -547,10 +694,14 @@ mod ldsi_torture {
         assert!(topo_only.lambda.is_finite());
 
         // Vérifier que les composantes sont différentes
-        assert!((ncd_only.lambda - entropy_only.lambda).abs() > 0.001 ||
-                (entropy_only.lambda - topo_only.lambda).abs() > 0.001,
+        assert!(
+            (ncd_only.lambda - entropy_only.lambda).abs() > 0.001
+                || (entropy_only.lambda - topo_only.lambda).abs() > 0.001,
             "Les composantes devraient varier: NCD={}, H={}, T={}",
-            ncd_only.lambda, entropy_only.lambda, topo_only.lambda);
+            ncd_only.lambda,
+            entropy_only.lambda,
+            topo_only.lambda
+        );
     }
 
     #[test]
@@ -559,7 +710,11 @@ mod ldsi_torture {
         let text = "Hello world.";
         let result = compute_ldsi(text, text, None);
 
-        assert!(result.lambda < 0.7, "Textes identiques: lambda={} trop élevé", result.lambda);
+        assert!(
+            result.lambda < 0.7,
+            "Textes identiques: lambda={} trop élevé",
+            result.lambda
+        );
     }
 
     #[test]
@@ -573,7 +728,11 @@ mod ldsi_torture {
         let result = compute_ldsi(standard, fractured, None);
 
         // Devrait être dans la zone ARCHITECTE (0.7-1.2)
-        assert!(result.lambda > 0.3, "Standard vs Fracturé trop bas: {}", result.lambda);
+        assert!(
+            result.lambda > 0.3,
+            "Standard vs Fracturé trop bas: {}",
+            result.lambda
+        );
     }
 
     #[test]
@@ -599,8 +758,12 @@ mod ldsi_torture {
 
         // Le ratio d'entropie H(B)/H(A) est différent de H(A)/H(B)
         // Donc les scores devraient être différents
-        assert!((ab.lambda - ba.lambda).abs() > 0.01,
-            "LDSI devrait être asymétrique: A→B={}, B→A={}", ab.lambda, ba.lambda);
+        assert!(
+            (ab.lambda - ba.lambda).abs() > 0.01,
+            "LDSI devrait être asymétrique: A→B={}, B→A={}",
+            ab.lambda,
+            ba.lambda
+        );
     }
 
     #[test]
@@ -613,9 +776,12 @@ mod ldsi_torture {
 
         // Le ratio d'entropie est cappé à 2.0
         // Donc lambda ne devrait pas exploser
-        assert!(result.lambda < 3.0,
+        assert!(
+            result.lambda < 3.0,
             "Cap entropie défaillant: lambda={} (entropy_ratio={})",
-            result.lambda, result.entropy.ratio);
+            result.lambda,
+            result.entropy.ratio
+        );
     }
 
     #[test]
@@ -624,21 +790,39 @@ mod ldsi_torture {
         let text_a = "Test A";
         let text_b = "Test B";
 
-        let result = compute_ldsi(text_a, text_b, Some(LdsiCoefficients {
-            alpha: -1.0, beta: -1.0, gamma: -1.0
-        }));
+        let result = compute_ldsi(
+            text_a,
+            text_b,
+            Some(LdsiCoefficients {
+                alpha: -1.0,
+                beta: -1.0,
+                gamma: -1.0,
+            }),
+        );
 
-        assert!(result.lambda.is_finite(), "Coefficients négatifs: ne doit pas crasher");
+        assert!(
+            result.lambda.is_finite(),
+            "Coefficients négatifs: ne doit pas crasher"
+        );
     }
 
     #[test]
     fn test_ldsi_zero_coefficients() {
         // Tous les coefficients à zéro
-        let result = compute_ldsi("A", "B", Some(LdsiCoefficients {
-            alpha: 0.0, beta: 0.0, gamma: 0.0
-        }));
+        let result = compute_ldsi(
+            "A",
+            "B",
+            Some(LdsiCoefficients {
+                alpha: 0.0,
+                beta: 0.0,
+                gamma: 0.0,
+            }),
+        );
 
-        assert_eq!(result.lambda, 0.0, "Coefficients zéro: lambda devrait être 0");
+        assert_eq!(
+            result.lambda, 0.0,
+            "Coefficients zéro: lambda devrait être 0"
+        );
     }
 
     #[test]
@@ -651,8 +835,14 @@ mod ldsi_torture {
 
         let result = compute_ldsi(text_a, text_b, None);
 
-        assert!(result.lambda.is_finite(), "Unicode extrême: ne doit pas crasher");
-        assert!(result.lambda > 0.0, "Unicode devrait créer de la divergence");
+        assert!(
+            result.lambda.is_finite(),
+            "Unicode extrême: ne doit pas crasher"
+        );
+        assert!(
+            result.lambda > 0.0,
+            "Unicode devrait créer de la divergence"
+        );
     }
 }
 
@@ -675,8 +865,11 @@ mod cleaner_torture {
         let text = "le la les un une de du des et ou mais";
         let result = clean_default(text);
 
-        assert!(result.trim().is_empty() || result.split_whitespace().count() < 3,
-            "Stop-words non supprimés: '{}'", result);
+        assert!(
+            result.trim().is_empty() || result.split_whitespace().count() < 3,
+            "Stop-words non supprimés: '{}'",
+            result
+        );
     }
 
     #[test]
@@ -685,9 +878,14 @@ mod cleaner_torture {
         let text = "L'intelligence artificielle révolutionne le monde moderne";
         let result = clean_default(text);
 
-        assert!(result.contains("intelligence") || result.contains("artificielle") ||
-                result.contains("révolutionne") || result.contains("monde"),
-            "Contenu sémantique perdu: '{}'", result);
+        assert!(
+            result.contains("intelligence")
+                || result.contains("artificielle")
+                || result.contains("révolutionne")
+                || result.contains("monde"),
+            "Contenu sémantique perdu: '{}'",
+            result
+        );
     }
 
     #[test]
@@ -705,8 +903,11 @@ mod cleaner_torture {
         let result = clean_default(text);
 
         // La ponctuation excessive devrait être nettoyée
-        assert!(!result.contains("!!!") && !result.contains("???"),
-            "Ponctuation excessive non nettoyée: '{}'", result);
+        assert!(
+            !result.contains("!!!") && !result.contains("???"),
+            "Ponctuation excessive non nettoyée: '{}'",
+            result
+        );
     }
 
     #[test]
@@ -715,10 +916,14 @@ mod cleaner_torture {
         let result = clean_default(text);
 
         // Devrait normaliser la casse
-        assert!(result.chars().all(|c| !c.is_uppercase()) ||
-                result.chars().all(|c| !c.is_lowercase()) ||
-                result.contains("majuscules") || result.contains("MAJUSCULES"),
-            "Casse non normalisée: '{}'", result);
+        assert!(
+            result.chars().all(|c| !c.is_uppercase())
+                || result.chars().all(|c| !c.is_lowercase())
+                || result.contains("majuscules")
+                || result.contains("MAJUSCULES"),
+            "Casse non normalisée: '{}'",
+            result
+        );
     }
 
     #[test]
@@ -740,7 +945,11 @@ mod cleaner_torture {
         let r2 = clean_default(nfd);
 
         // Après normalisation, devraient être identiques
-        assert_eq!(r1, r2, "Normalisation Unicode défaillante: '{}' vs '{}'", r1, r2);
+        assert_eq!(
+            r1, r2,
+            "Normalisation Unicode défaillante: '{}' vs '{}'",
+            r1, r2
+        );
     }
 
     #[test]
@@ -759,7 +968,10 @@ mod cleaner_torture {
         let result = clean_default(&text);
 
         // Ne doit pas timeout ou crasher
-        assert!(result.len() < text.len(), "Le nettoyage devrait réduire la taille");
+        assert!(
+            result.len() < text.len(),
+            "Le nettoyage devrait réduire la taille"
+        );
     }
 
     #[test]
@@ -779,8 +991,11 @@ mod cleaner_torture {
 
         // Seuls les mots de 5+ caractères devraient rester
         for word in result.split_whitespace() {
-            assert!(word.len() >= 5 || word.is_empty(),
-                "Mot trop court non filtré: '{}'", word);
+            assert!(
+                word.len() >= 5 || word.is_empty(),
+                "Mot trop court non filtré: '{}'",
+                word
+            );
         }
     }
 }
@@ -805,7 +1020,12 @@ mod regression {
 
         for (a, b) in inputs {
             let result = compute_ldsi(a, b, None);
-            assert!(!result.lambda.is_nan(), "NaN détecté pour ({:?}, {:?})", a, b);
+            assert!(
+                !result.lambda.is_nan(),
+                "NaN détecté pour ({:?}, {:?})",
+                a,
+                b
+            );
             assert!(!result.ncd.score.is_nan());
             assert!(!result.entropy.ratio.is_nan());
             assert!(!result.topology.delta.is_nan());
@@ -817,7 +1037,11 @@ mod regression {
         // S'assurer qu'aucun Infinity ne se propage
         let result = compute_ldsi("a", "b".repeat(100000).as_str(), None);
 
-        assert!(result.lambda.is_finite(), "Infinity détecté: lambda={}", result.lambda);
+        assert!(
+            result.lambda.is_finite(),
+            "Infinity détecté: lambda={}",
+            result.lambda
+        );
         assert!(result.entropy.ratio.is_finite());
     }
 
@@ -827,7 +1051,7 @@ mod regression {
         let result = compute_ldsi(
             "Test standard text",
             "Completely different chaotic input",
-            None
+            None,
         );
 
         assert!(result.lambda >= 0.0, "Lambda négatif: {}", result.lambda);
@@ -848,8 +1072,16 @@ mod regression {
         let r2 = compute_ldsi(text_a, text_b, None);
         let r3 = compute_ldsi(text_a, text_b, None);
 
-        assert_eq!(r1.lambda, r2.lambda, "Non déterministe: {} vs {}", r1.lambda, r2.lambda);
-        assert_eq!(r2.lambda, r3.lambda, "Non déterministe: {} vs {}", r2.lambda, r3.lambda);
+        assert_eq!(
+            r1.lambda, r2.lambda,
+            "Non déterministe: {} vs {}",
+            r1.lambda, r2.lambda
+        );
+        assert_eq!(
+            r2.lambda, r3.lambda,
+            "Non déterministe: {} vs {}",
+            r2.lambda, r3.lambda
+        );
     }
 
     #[test]
@@ -875,8 +1107,11 @@ mod regression {
                 s if s < 1.2 => LdsiVerdict::Architecte,
                 _ => LdsiVerdict::Fou,
             };
-            assert_eq!(actual, expected_verdict,
-                "Frontière verdict incorrecte pour {}", score);
+            assert_eq!(
+                actual, expected_verdict,
+                "Frontière verdict incorrecte pour {}",
+                score
+            );
         }
     }
 }

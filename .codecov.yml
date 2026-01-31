@@ -1,0 +1,27 @@
+# Codecov configuration for LDSI
+# See: https://docs.codecov.io/docs/codecov-yaml
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 5%
+    patch:
+      default:
+        target: 80%
+
+ignore:
+  - "src/main.rs"
+  - "src/bin/**"
+  - "src/server/**"
+  - "tests/**"
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: true

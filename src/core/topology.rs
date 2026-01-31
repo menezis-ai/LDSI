@@ -8,7 +8,6 @@
 
 use petgraph::algo::connected_components;
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::visit::EdgeRef;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Résultat détaillé de l'analyse topologique
@@ -47,6 +46,38 @@ fn tokenize(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// Ajoute ou incrémente une arête entre deux nœuds
+fn add_or_increment_edge(graph: &mut DiGraph<String, u32>, from: NodeIndex, to: NodeIndex) {
+    if from == to {
+        return;
+    }
+    match graph.find_edge(from, to) {
+        Some(edge) => {
+            if let Some(weight) = graph.edge_weight_mut(edge) {
+                *weight += 1;
+            }
+        }
+        None => {
+            graph.add_edge(from, to, 1);
+        }
+    }
+}
+
+/// Crée les arêtes de co-occurrence pour une fenêtre de tokens
+fn add_window_edges(
+    graph: &mut DiGraph<String, u32>,
+    window: &[String],
+    node_indices: &HashMap<String, NodeIndex>,
+) {
+    for i in 0..window.len() {
+        for j in (i + 1)..window.len() {
+            let from = node_indices[&window[i]];
+            let to = node_indices[&window[j]];
+            add_or_increment_edge(graph, from, to);
+        }
+    }
+}
+
 /// Construit un graphe dirigé de co-occurrence
 ///
 /// - Nœuds = mots uniques (lemmatisés en minuscules)
@@ -57,33 +88,16 @@ fn build_cooccurrence_graph(tokens: &[String]) -> DiGraph<String, u32> {
 
     // Créer les nœuds
     for token in tokens {
-        if !node_indices.contains_key(token) {
-            let idx = graph.add_node(token.clone());
-            node_indices.insert(token.clone(), idx);
-        }
+        node_indices
+            .entry(token.clone())
+            .or_insert_with(|| graph.add_node(token.clone()));
     }
 
     // Créer les arêtes par fenêtre glissante
     if tokens.len() >= 2 {
-        for window in tokens.windows(WINDOW_SIZE.min(tokens.len())) {
-            for i in 0..window.len() {
-                for j in (i + 1)..window.len() {
-                    let from = node_indices[&window[i]];
-                    let to = node_indices[&window[j]];
-
-                    // Éviter les self-loops
-                    if from != to {
-                        // Incrémenter le poids si l'arête existe déjà
-                        if let Some(edge) = graph.find_edge(from, to) {
-                            if let Some(weight) = graph.edge_weight_mut(edge) {
-                                *weight += 1;
-                            }
-                        } else {
-                            graph.add_edge(from, to, 1);
-                        }
-                    }
-                }
-            }
+        let window_size = WINDOW_SIZE.min(tokens.len());
+        for window in tokens.windows(window_size) {
+            add_window_edges(&mut graph, window, &node_indices);
         }
     }
 
@@ -101,9 +115,7 @@ fn compute_density(node_count: usize, edge_count: usize) -> f64 {
 
 /// Calcule le coefficient de clustering local d'un nœud
 fn local_clustering(graph: &DiGraph<String, u32>, node: NodeIndex) -> f64 {
-    let neighbors: HashSet<NodeIndex> = graph
-        .neighbors_undirected(node)
-        .collect();
+    let neighbors: HashSet<NodeIndex> = graph.neighbors_undirected(node).collect();
 
     let k = neighbors.len();
     if k < 2 {
@@ -158,9 +170,9 @@ fn average_path_length(graph: &DiGraph<String, u32>) -> f64 {
             let current_dist = visited[&current];
 
             for neighbor in graph.neighbors(current) {
-                if !visited.contains_key(&neighbor) {
+                if let std::collections::hash_map::Entry::Vacant(e) = visited.entry(neighbor) {
                     let new_dist = current_dist + 1;
-                    visited.insert(neighbor, new_dist);
+                    e.insert(new_dist);
                     queue.push_back(neighbor);
                     total_length += new_dist;
                     path_count += 1;
@@ -176,6 +188,30 @@ fn average_path_length(graph: &DiGraph<String, u32>) -> f64 {
     }
 }
 
+/// Parcourt une composante connexe par BFS et retourne sa taille
+fn bfs_component_size(
+    graph: &DiGraph<String, u32>,
+    start: NodeIndex,
+    visited: &mut HashSet<NodeIndex>,
+) -> usize {
+    let mut component_size = 0;
+    let mut queue: VecDeque<NodeIndex> = VecDeque::new();
+    queue.push_back(start);
+
+    while let Some(current) = queue.pop_front() {
+        if visited.insert(current) {
+            component_size += 1;
+            for neighbor in graph.neighbors_undirected(current) {
+                if !visited.contains(&neighbor) {
+                    queue.push_back(neighbor);
+                }
+            }
+        }
+    }
+
+    component_size
+}
+
 /// Trouve la taille de la plus grande composante connexe
 fn largest_connected_component(graph: &DiGraph<String, u32>) -> usize {
     if graph.node_count() == 0 {
@@ -187,23 +223,8 @@ fn largest_connected_component(graph: &DiGraph<String, u32>) -> usize {
 
     for node in graph.node_indices() {
         if !visited.contains(&node) {
-            // BFS pour trouver la composante
-            let mut component_size = 0;
-            let mut queue: VecDeque<NodeIndex> = VecDeque::new();
-            queue.push_back(node);
-
-            while let Some(current) = queue.pop_front() {
-                if visited.insert(current) {
-                    component_size += 1;
-                    for neighbor in graph.neighbors_undirected(current) {
-                        if !visited.contains(&neighbor) {
-                            queue.push_back(neighbor);
-                        }
-                    }
-                }
-            }
-
-            max_size = max_size.max(component_size);
+            let size = bfs_component_size(graph, node, &mut visited);
+            max_size = max_size.max(size);
         }
     }
 
@@ -217,10 +238,7 @@ fn average_degree(graph: &DiGraph<String, u32>) -> f64 {
         return 0.0;
     }
 
-    let total_degree: usize = graph
-        .node_indices()
-        .map(|n| graph.edges(n).count())
-        .sum();
+    let total_degree: usize = graph.node_indices().map(|n| graph.edges(n).count()).sum();
 
     total_degree as f64 / node_count as f64
 }
@@ -332,7 +350,10 @@ mod tests {
         let result = analyze_topology(text);
 
         // Un texte bien connecté devrait avoir une seule composante
-        assert!(result.lcc_ratio > 0.5, "LCC ratio devrait être élevé pour texte connecté");
+        assert!(
+            result.lcc_ratio > 0.5,
+            "LCC ratio devrait être élevé pour texte connecté"
+        );
     }
 
     #[test]
@@ -349,6 +370,9 @@ mod tests {
         let delta = topology_delta(standard, enriched);
 
         // Le texte enrichi devrait avoir une structure au moins comparable
-        assert!(delta > 0.0, "Delta devrait être positif pour texte enrichi structuré");
+        assert!(
+            delta > 0.0,
+            "Delta devrait être positif pour texte enrichi structuré"
+        );
     }
 }

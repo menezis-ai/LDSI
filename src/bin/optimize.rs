@@ -1,7 +1,7 @@
 // src/bin/optimize.rs
 // C'est ici qu'on transforme l'intuition en science dure.
 
-use ldsi::core::{compute_ldsi, LdsiCoefficients};
+use ldsi::core::{LdsiCoefficients, compute_ldsi};
 
 struct TrainingCase {
     text_a: String,
@@ -55,7 +55,11 @@ fn main() {
                 // On normalise pour que la somme fasse environ 1.0 (optionnel mais propre)
                 // Ou on teste juste des poids bruts. Restons libres.
 
-                let coeffs = LdsiCoefficients { alpha: a, beta: b, gamma: g };
+                let coeffs = LdsiCoefficients {
+                    alpha: a,
+                    beta: b,
+                    gamma: g,
+                };
 
                 let mut total_error = 0.0;
 
@@ -68,8 +72,10 @@ fn main() {
                 if total_error < min_error {
                     min_error = total_error;
                     best_coeffs = coeffs;
-                    println!("Nouveau Best: Error={:.4} | a={:.2} b={:.2} g={:.2}",
-                             min_error, best_coeffs.alpha, best_coeffs.beta, best_coeffs.gamma);
+                    println!(
+                        "Nouveau Best: Error={:.4} | a={:.2} b={:.2} g={:.2}",
+                        min_error, best_coeffs.alpha, best_coeffs.beta, best_coeffs.gamma
+                    );
                 }
             }
         }
@@ -82,5 +88,8 @@ fn main() {
 
     // Comparaison avec ton intuition
     println!("\nTon Intuition : 0.40 / 0.35 / 0.25");
-    println!("Somme coeffs  : {:.2}", best_coeffs.alpha + best_coeffs.beta + best_coeffs.gamma);
+    println!(
+        "Somme coeffs  : {:.2}",
+        best_coeffs.alpha + best_coeffs.beta + best_coeffs.gamma
+    );
 }

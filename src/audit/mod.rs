@@ -7,4 +7,4 @@
 
 pub mod logger;
 
-pub use logger::{AuditEntry, AuditLogger, AuditMetadata, SummaryReport};
+pub use logger::AuditLogger;
