@@ -5,27 +5,30 @@
 
 use axum::{
     body::Body,
-    extract::{Extension, Path, Json},
-    http::{header, Response, StatusCode},
+    extract::{Extension, Json, Path},
+    http::{Response, StatusCode, header},
     response::{Html, IntoResponse},
 };
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::RwLock;
 use tera::{Context, Tera};
+use tokio::sync::RwLock;
 
-use super::state::*;
+use super::state::{
+    AppState, AvailableModels, BenchmarkRequest, BenchmarkStatus, LdsiResultSummary, ModelResult,
+    ModelStatus, ProviderType, TopologyData, TopologyMetrics,
+};
 use super::{StaticFiles, Templates};
 use crate::core::compute_ldsi;
-use crate::probe::{ApiType, Injector, LlmConfig, MultiInjector};
+use crate::probe::{Injector, LlmConfig};
 
 /// Charge et rend un template Tera
 fn render_template(name: &str, context: &Context) -> Result<String, String> {
-    let template_content = Templates::get(name)
-        .ok_or_else(|| format!("Template not found: {}", name))?;
+    let template_content =
+        Templates::get(name).ok_or_else(|| format!("Template not found: {}", name))?;
 
-    let template_str = std::str::from_utf8(template_content.data.as_ref())
-        .map_err(|e| e.to_string())?;
+    let template_str =
+        std::str::from_utf8(template_content.data.as_ref()).map_err(|e| e.to_string())?;
 
     let mut tera = Tera::default();
     tera.add_raw_template(name, template_str)
@@ -35,9 +38,7 @@ fn render_template(name: &str, context: &Context) -> Result<String, String> {
 }
 
 /// Dashboard principal
-pub async fn dashboard(
-    Extension(state): Extension<Arc<RwLock<AppState>>>,
-) -> impl IntoResponse {
+pub async fn dashboard(Extension(state): Extension<Arc<RwLock<AppState>>>) -> impl IntoResponse {
     let state = state.read().await;
 
     let mut context = Context::new();
@@ -46,16 +47,16 @@ pub async fn dashboard(
     context.insert("models", &AvailableModels::default());
 
     // Récupérer les benchmarks récents
-    let recent: Vec<_> = state.benchmarks
-        .values()
-        .take(10)
-        .cloned()
-        .collect();
+    let recent: Vec<_> = state.benchmarks.values().take(10).cloned().collect();
     context.insert("recent_benchmarks", &recent);
 
     match render_template("dashboard.html", &context) {
         Ok(html) => Html(html).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Template error: {}", e)).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Template error: {}", e),
+        )
+            .into_response(),
     }
 }
 
@@ -78,7 +79,11 @@ pub async fn results_page(
 
     match render_template("results.html", &context) {
         Ok(html) => Html(html).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Template error: {}", e)).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Template error: {}", e),
+        )
+            .into_response(),
     }
 }
 
@@ -160,7 +165,10 @@ pub async fn run_benchmark(
 
             let injector = Injector::new(config);
 
-            match injector.inject_ab(&request_clone.prompt_a, &request_clone.prompt_b).await {
+            match injector
+                .inject_ab(&request_clone.prompt_a, &request_clone.prompt_b)
+                .await
+            {
                 Ok((response_a, response_b)) => {
                     let ldsi_result = compute_ldsi(&response_a, &response_b, None);
                     let duration = start.elapsed().as_millis() as u64;
@@ -204,10 +212,10 @@ pub async fn run_benchmark(
             state.update_benchmark(&id_clone, BenchmarkStatus::Completed, results);
 
             // Sauvegarde automatique dans audits/
-            if let Some(session) = state.get_benchmark(&id_clone) {
-                if let Err(e) = session.save_to_audit() {
-                    eprintln!("[AUDIT] Erreur sauvegarde: {}", e);
-                }
+            if let Some(session) = state.get_benchmark(&id_clone)
+                && let Err(e) = session.save_to_audit()
+            {
+                eprintln!("[AUDIT] Erreur sauvegarde: {}", e);
             }
         }
     });
@@ -245,23 +253,21 @@ pub async fn get_topology_data(
 ) -> impl IntoResponse {
     let state = state.read().await;
 
-    if let Some(session) = state.get_benchmark(&id) {
-        if let Some(result) = session.results.iter().find(|r| r.model_name == model) {
-            if let Some(ref topology) = result.topology {
-                return Json(serde_json::json!(topology)).into_response();
-            }
-        }
+    if let Some(session) = state.get_benchmark(&id)
+        && let Some(result) = session.results.iter().find(|r| r.model_name == model)
+        && let Some(ref topology) = result.topology
+    {
+        return Json(serde_json::json!(topology)).into_response();
     }
 
     Json(serde_json::json!({
         "error": "Topology data not found"
-    })).into_response()
+    }))
+    .into_response()
 }
 
 /// Liste des modèles disponibles
-pub async fn list_models(
-    Extension(state): Extension<Arc<RwLock<AppState>>>,
-) -> impl IntoResponse {
+pub async fn list_models(Extension(state): Extension<Arc<RwLock<AppState>>>) -> impl IntoResponse {
     let state = state.read().await;
     let models = AvailableModels::default();
 

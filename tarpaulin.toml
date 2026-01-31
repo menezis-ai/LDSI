@@ -1,0 +1,21 @@
+# Tarpaulin configuration for CI coverage (Linux runners)
+# Run with: cargo tarpaulin --config tarpaulin.toml
+
+[coverage]
+# Output formats
+out = ["Html", "Lcov", "Json"]
+
+# Skip files that can't be meaningfully tested
+exclude-files = [
+    "src/main.rs",           # CLI entry point
+    "src/bin/optimize.rs",   # Grid search utility
+    "src/server/*",          # Server requires integration tests
+]
+
+# Test configuration
+test-threads = 1
+verbose = true
+timeout = "120s"
+
+# Report configuration
+output-dir = "coverage"

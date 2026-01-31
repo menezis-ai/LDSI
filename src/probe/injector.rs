@@ -83,6 +83,7 @@ impl LlmConfig {
     }
 
     /// Configuration pour OpenAI
+    #[allow(dead_code)]
     pub fn openai(model: &str, api_key: &str) -> Self {
         Self {
             base_url: "https://api.openai.com".to_string(),
@@ -96,6 +97,7 @@ impl LlmConfig {
     }
 
     /// Configuration pour Anthropic
+    #[allow(dead_code)]
     pub fn anthropic(model: &str, api_key: &str) -> Self {
         Self {
             base_url: "https://api.anthropic.com".to_string(),
@@ -112,6 +114,7 @@ impl LlmConfig {
 // ============ Modèles OpenRouter (Dec 2025 - VRAIS IDs) ============
 
 /// Liste des modèles OpenRouter courants pour le benchmark
+#[allow(dead_code)]
 pub mod openrouter_models {
     // === ANTHROPIC (Claude) ===
     pub const CLAUDE_OPUS_45: &str = "anthropic/claude-opus-4.5";
@@ -265,6 +268,7 @@ struct AnthropicContent {
 
 /// Erreur d'injection
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum InjectorError {
     NetworkError(String),
     ApiError(String),
@@ -303,6 +307,7 @@ impl Injector {
     }
 
     /// Retourne la configuration actuelle
+    #[allow(dead_code)]
     pub fn config(&self) -> &LlmConfig {
         &self.config
     }
@@ -456,11 +461,10 @@ impl Injector {
             max_tokens: self.config.max_tokens,
         };
 
-        let api_key = self
-            .config
-            .api_key
-            .as_ref()
-            .ok_or_else(|| InjectorError::ApiError("OpenRouter requires API key".to_string()))?;
+        let api_key =
+            self.config.api_key.as_ref().ok_or_else(|| {
+                InjectorError::ApiError("OpenRouter requires API key".to_string())
+            })?;
 
         let response = self
             .client
@@ -504,38 +508,48 @@ impl Injector {
 }
 
 /// Multi-Injector pour benchmarks parallèles sur plusieurs modèles
+#[allow(dead_code)]
 pub struct MultiInjector {
     injectors: Vec<(String, Injector)>,
 }
 
+#[allow(dead_code)]
 impl MultiInjector {
     /// Crée un multi-injecteur vide
     pub fn new() -> Self {
-        Self { injectors: Vec::new() }
+        Self {
+            injectors: Vec::new(),
+        }
     }
 
     /// Ajoute un modèle au benchmark
     pub fn add_model(&mut self, name: &str, config: LlmConfig) {
-        self.injectors.push((name.to_string(), Injector::new(config)));
+        self.injectors
+            .push((name.to_string(), Injector::new(config)));
     }
 
     /// Ajoute un modèle OpenRouter
     pub fn add_openrouter(&mut self, model_id: &str, api_key: &str) {
         let config = LlmConfig::openrouter(model_id, api_key);
         // Extraire le nom court du modèle (après le /)
-        let name = model_id.split('/').last().unwrap_or(model_id);
-        self.injectors.push((name.to_string(), Injector::new(config)));
+        let name = model_id.split('/').next_back().unwrap_or(model_id);
+        self.injectors
+            .push((name.to_string(), Injector::new(config)));
     }
 
     /// Ajoute un modèle Ollama local
     pub fn add_ollama(&mut self, model: &str) {
         let config = LlmConfig::ollama_local(model);
-        self.injectors.push((model.to_string(), Injector::new(config)));
+        self.injectors
+            .push((model.to_string(), Injector::new(config)));
     }
 
     /// Retourne la liste des modèles configurés
     pub fn models(&self) -> Vec<&str> {
-        self.injectors.iter().map(|(name, _)| name.as_str()).collect()
+        self.injectors
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .collect()
     }
 
     /// Exécute le prompt sur tous les modèles en parallèle
