@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Rust](https://img.shields.io/badge/Rust-1.83+-orange.svg)](https://www.rust-lang.org/)
-[![CI](https://github.com/JulienDbrt/LDSI/actions/workflows/ci.yml/badge.svg)](https://github.com/JulienDbrt/LDSI/actions/workflows/ci.yml)
+[![CI](https://github.com/menezis-ai/LDSI/actions/workflows/ci.yml/badge.svg)](https://github.com/menezis-ai/LDSI/actions/workflows/ci.yml)
 
 **A White-Box Benchmark for Measuring Semantic Divergence in Large Language Models**
 
@@ -173,7 +173,7 @@ Where n = text length, w = window size, |V| = vocabulary size.
 ### 5.1 From Source
 
 ```bash
-git clone https://github.com/JulienDbrt/LDSI.git
+git clone https://github.com/menezis-ai/LDSI.git
 cd LDSI
 cargo build --release
 ```
@@ -257,7 +257,7 @@ Preliminary experiments demonstrate clear separation between:
   author = {Dabert, Julien},
   title = {{LDSI}: {L}yapunov-{D}abert {S}tability {I}ndex for {LLM} Evaluation},
   year = {2025},
-  url = {https://github.com/JulienDbrt/LDSI},
+  url = {https://github.com/menezis-ai/LDSI},
   version = {0.2.0}
 }
 ```
@@ -412,7 +412,7 @@ src/
 ## 5. Installation
 
 ```bash
-git clone https://github.com/JulienDbrt/LDSI.git
+git clone https://github.com/menezis-ai/LDSI.git
 cd LDSI
 cargo build --release
 ./target/release/ldsi --help
@@ -475,7 +475,7 @@ ldsi inject \
   author = {Dabert, Julien},
   title = {{LDSI}: {L}yapunov-{D}abert {S}tability {I}ndex pour l'Évaluation des {LLM}},
   year = {2025},
-  url = {https://github.com/JulienDbrt/LDSI},
+  url = {https://github.com/menezis-ai/LDSI},
   version = {0.2.0}
 }
 ```
@@ -618,7 +618,7 @@ src/
 ## 5. Instalación
 
 ```bash
-git clone https://github.com/JulienDbrt/LDSI.git
+git clone https://github.com/menezis-ai/LDSI.git
 cd LDSI
 cargo build --release
 ./target/release/ldsi --help
@@ -681,7 +681,7 @@ ldsi inject \
   author = {Dabert, Julien},
   title = {{LDSI}: {L}yapunov-{D}abert {S}tability {I}ndex para Evaluación de {LLM}},
   year = {2025},
-  url = {https://github.com/JulienDbrt/LDSI},
+  url = {https://github.com/menezis-ai/LDSI},
   version = {0.2.0}
 }
 ```

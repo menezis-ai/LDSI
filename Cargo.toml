@@ -5,7 +5,7 @@ edition = "2024"
 authors = ["Julien DABERT"]
 description = "Lyapunov-Dabert Stability Index - White Box LLM Benchmark"
 license = "Apache-2.0"
-repository = "https://github.com/julien-dabert/ldsi"
+repository = "https://github.com/menezis-ai/LDSI"
 
 [dependencies]
 # Compression (NCD)

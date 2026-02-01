@@ -3,3 +3,11 @@
 .env.local
 CLAUDE.md
 /.scannerwork
+
+# Private research documents
+DATA_PREP.md
+/experiments/
+
+# Local tools
+/.clawdhub/
+/skills/
