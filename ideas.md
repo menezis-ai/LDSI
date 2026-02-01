@@ -1,5 +1,37 @@
 # Ideas - LDSI Future Work
 
+## Prochaines Étapes Critiques (Priorité Haute)
+
+Ces étapes transforment LDSI d'un outil fonctionnel en une contribution scientifique reconnue.
+
+### 1. Validation Empirique avec Annotations Humaines
+- Recruter des annotateurs (chercheurs, linguistes, développeurs)
+- Protocole : présenter des paires (prompt, réponse) sans révéler le score LDSI
+- Demander une classification manuelle : ZOMBIE / REBELLE / ARCHITECTE / FOU
+- Calculer l'accord inter-annotateurs (Fleiss' Kappa)
+- Mesurer la corrélation entre jugement humain et λLD
+- **Objectif** : prouver que LDSI capture une réalité perceptible par les humains
+
+### 2. Benchmark sur Corpus Standardisé
+- Utiliser des datasets publics : OpenAssistant, Anthropic HH-RLHF, LMSYS-Chat-1M
+- Générer des réponses avec plusieurs modèles (GPT-4, Claude, Llama, Mistral)
+- Calculer λLD sur chaque paire (prompt, réponse)
+- Publier les résultats bruts pour reproductibilité
+- **Objectif** : permettre la comparaison avec d'autres métriques
+
+### 3. Publication / Peer Review
+- Format cible : workshop NeurIPS, ACL, ou EMNLP (évaluation LLM)
+- Structure du papier :
+  1. Critique du paradigme LLM-as-judge (motivation)
+  2. Fondements théoriques (NCD, entropie, topologie)
+  3. Formalisation de λLD et taxonomie des verdicts
+  4. Validation empirique (corrélation humaine + benchmarks)
+  5. Limitations et travaux futurs
+- Alternatives : arXiv preprint + blog technique pour visibilité rapide
+- **Objectif** : légitimité académique et feedback de la communauté
+
+---
+
 ## Validation Empirique des Coefficients (α, β, γ)
 
 Les coefficients actuels (α=0.40, β=0.35, γ=0.25) sont basés sur l'intuition :
