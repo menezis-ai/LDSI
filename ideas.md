@@ -56,6 +56,54 @@ Les coefficients actuels (α=0.40, β=0.35, γ=0.25) sont basés sur l'intuition
 - Alerter si un modèle déployé régresse vers ZOMBIE
 - Dashboard de suivi temporel
 
+### Mode Streaming (Temps Réel)
+- LDSI calculé en continu sur flux de tokens
+- Fenêtre glissante pour détecter les dérives mid-conversation
+- Alerter dès qu'un modèle bascule vers FOU en cours de génération
+- Application : guardrails temps réel pour chatbots en production
+
+### Détection d'Injection de Prompt
+- Hypothèse : un prompt injecté provoque une signature LDSI distincte
+- Patterns attendus : spike NCD brutal, effondrement topologique, entropie anormale
+- Application : sécurité des chatbots, détection d'attaques adversariales
+- Comparer avec les méthodes existantes (perplexity-based, classifiers)
+
+### Fingerprinting de Modèles
+- Chaque LLM a-t-il une "empreinte LDSI" caractéristique ?
+- Construire une base de signatures (Claude, GPT, Llama, Mistral, etc.)
+- Application forensique : identifier quel modèle a généré un texte anonyme
+- Hypothèse : le style de divergence est model-specific
+
+### Qualité du Fine-Tuning
+- Mesurer si un fine-tuning crée des ZOMBIES (sur-apprentissage = Lissage)
+- Comparer λLD avant/après fine-tuning sur mêmes prompts
+- Métrique de santé pour RLHF/DPO/SFT
+- Détecter le "mode collapse" via chute de diversité topologique
+
+### Analyse Hiérarchique
+- λLD calculé à plusieurs granularités : phrase → paragraphe → document
+- Localiser où la divergence se concentre
+- Identifier les "points chauds" de créativité ou de rigidité
+- Visualisation : heatmap de divergence sur le texte
+
+### Comparaison des Compresseurs
+- Benchmark NCD avec différents algorithmes : zstd, lz4, brotli, gzip, lzma
+- Le choix du compresseur impacte-t-il la stabilité/sensibilité de NCD ?
+- Tradeoff : vitesse vs précision de l'approximation Kolmogorov
+- Documenter les biais algorithmiques de chaque compresseur
+
+### Courbes de Calibration Humaine
+- Collecter des annotations humaines de "qualité de réponse"
+- Mapper λLD → perception humaine (corrélation)
+- Valider avec crowdsourcing (Prolific, MTurk)
+- Objectif : interpréter λLD en termes compréhensibles ("cette réponse est X% créative")
+
+### Résistance Adversariale
+- Peut-on "gamer" LDSI ? Injecter du bruit pour simuler ARCHITECTE ?
+- Attaques possibles : padding aléatoire, synonymes forcés, structure artificielle
+- Contre-mesures : détection de patterns non-naturels, analyse de distribution
+- Robustesse comme critère de qualité de la métrique
+
 ## Notes Théoriques
 
 ### Pourquoi α > β > γ ?
