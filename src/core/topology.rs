@@ -3,6 +3,10 @@
 //! Transforme le texte en graphe de co-occurrence et mesure sa structure.
 //! Détecte le délire (graphe éclaté) vs l'intelligence (graphe interconnecté).
 //!
+//! Les arêtes sont pondérées par décroissance inverse de la distance :
+//! weight = 1.0 / (distance + 1), capturant les associations long-range
+//! sans noyer le graphe dans le bruit.
+//!
 //! Auteur: Julien DABERT
 //! LDSI - Lyapunov-Dabert Stability Index
 
@@ -35,8 +39,10 @@ pub struct TopologyResult {
     pub avg_degree: f64,
 }
 
-/// Taille de la fenêtre glissante pour co-occurrence
-const WINDOW_SIZE: usize = 5;
+/// Distance maximale de co-occurrence (tokens).
+/// Au-delà, le poids décroît jusqu'à être négligeable.
+/// Chaque arête reçoit un poids = 1.0 / (distance + 1).
+const MAX_WINDOW: usize = 15;
 
 /// Tokenize simplement (même logique que entropy pour cohérence)
 fn tokenize(text: &str) -> Vec<String> {
@@ -46,34 +52,42 @@ fn tokenize(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// Ajoute ou incrémente une arête entre deux nœuds
-fn add_or_increment_edge(graph: &mut DiGraph<String, u32>, from: NodeIndex, to: NodeIndex) {
+/// Ajoute ou incrémente une arête pondérée entre deux nœuds
+fn add_or_increment_edge(
+    graph: &mut DiGraph<String, f64>,
+    from: NodeIndex,
+    to: NodeIndex,
+    weight: f64,
+) {
     if from == to {
         return;
     }
     match graph.find_edge(from, to) {
         Some(edge) => {
-            if let Some(weight) = graph.edge_weight_mut(edge) {
-                *weight += 1;
+            if let Some(w) = graph.edge_weight_mut(edge) {
+                *w += weight;
             }
         }
         None => {
-            graph.add_edge(from, to, 1);
+            graph.add_edge(from, to, weight);
         }
     }
 }
 
 /// Crée les arêtes de co-occurrence pour une fenêtre de tokens
+/// avec pondération par décroissance inverse de la distance.
 fn add_window_edges(
-    graph: &mut DiGraph<String, u32>,
+    graph: &mut DiGraph<String, f64>,
     window: &[String],
     node_indices: &HashMap<String, NodeIndex>,
 ) {
     for i in 0..window.len() {
         for j in (i + 1)..window.len() {
+            let distance = j - i;
+            let weight = 1.0 / (distance as f64 + 1.0);
             let from = node_indices[&window[i]];
             let to = node_indices[&window[j]];
-            add_or_increment_edge(graph, from, to);
+            add_or_increment_edge(graph, from, to, weight);
         }
     }
 }
@@ -81,9 +95,9 @@ fn add_window_edges(
 /// Construit un graphe dirigé de co-occurrence
 ///
 /// - Nœuds = mots uniques (lemmatisés en minuscules)
-/// - Arêtes = séquentialité dans une fenêtre glissante
-fn build_cooccurrence_graph(tokens: &[String]) -> DiGraph<String, u32> {
-    let mut graph: DiGraph<String, u32> = DiGraph::new();
+/// - Arêtes = co-occurrence dans une fenêtre glissante, pondérées par 1/(d+1)
+fn build_cooccurrence_graph(tokens: &[String]) -> DiGraph<String, f64> {
+    let mut graph: DiGraph<String, f64> = DiGraph::new();
     let mut node_indices: HashMap<String, NodeIndex> = HashMap::new();
 
     // Créer les nœuds
@@ -93,9 +107,9 @@ fn build_cooccurrence_graph(tokens: &[String]) -> DiGraph<String, u32> {
             .or_insert_with(|| graph.add_node(token.clone()));
     }
 
-    // Créer les arêtes par fenêtre glissante
+    // Créer les arêtes par fenêtre glissante avec décroissance
     if tokens.len() >= 2 {
-        let window_size = WINDOW_SIZE.min(tokens.len());
+        let window_size = MAX_WINDOW.min(tokens.len());
         for window in tokens.windows(window_size) {
             add_window_edges(&mut graph, window, &node_indices);
         }
@@ -114,7 +128,7 @@ fn compute_density(node_count: usize, edge_count: usize) -> f64 {
 }
 
 /// Calcule le coefficient de clustering local d'un nœud
-fn local_clustering(graph: &DiGraph<String, u32>, node: NodeIndex) -> f64 {
+fn local_clustering(graph: &DiGraph<String, f64>, node: NodeIndex) -> f64 {
     let neighbors: HashSet<NodeIndex> = graph.neighbors_undirected(node).collect();
 
     let k = neighbors.len();
@@ -136,7 +150,7 @@ fn local_clustering(graph: &DiGraph<String, u32>, node: NodeIndex) -> f64 {
 }
 
 /// Calcule le coefficient de clustering moyen
-fn average_clustering(graph: &DiGraph<String, u32>) -> f64 {
+fn average_clustering(graph: &DiGraph<String, f64>) -> f64 {
     let nodes: Vec<NodeIndex> = graph.node_indices().collect();
     if nodes.is_empty() {
         return 0.0;
@@ -147,7 +161,7 @@ fn average_clustering(graph: &DiGraph<String, u32>) -> f64 {
 }
 
 /// Calcule la longueur moyenne des plus courts chemins (BFS, échantillonné)
-fn average_path_length(graph: &DiGraph<String, u32>) -> f64 {
+fn average_path_length(graph: &DiGraph<String, f64>) -> f64 {
     let nodes: Vec<NodeIndex> = graph.node_indices().collect();
     if nodes.len() < 2 {
         return 0.0;
@@ -190,7 +204,7 @@ fn average_path_length(graph: &DiGraph<String, u32>) -> f64 {
 
 /// Parcourt une composante connexe par BFS et retourne sa taille
 fn bfs_component_size(
-    graph: &DiGraph<String, u32>,
+    graph: &DiGraph<String, f64>,
     start: NodeIndex,
     visited: &mut HashSet<NodeIndex>,
 ) -> usize {
@@ -213,7 +227,7 @@ fn bfs_component_size(
 }
 
 /// Trouve la taille de la plus grande composante connexe
-fn largest_connected_component(graph: &DiGraph<String, u32>) -> usize {
+fn largest_connected_component(graph: &DiGraph<String, f64>) -> usize {
     if graph.node_count() == 0 {
         return 0;
     }
@@ -232,7 +246,7 @@ fn largest_connected_component(graph: &DiGraph<String, u32>) -> usize {
 }
 
 /// Calcule le degré moyen des nœuds
-fn average_degree(graph: &DiGraph<String, u32>) -> f64 {
+fn average_degree(graph: &DiGraph<String, f64>) -> f64 {
     let node_count = graph.node_count();
     if node_count == 0 {
         return 0.0;
@@ -326,8 +340,8 @@ pub fn topology_delta(text_a: &str, text_b: &str) -> f64 {
         0.0
     };
 
-    // Score composite
-    (lcc_score * 0.5) + (clustering_score * 0.3) + fragmentation_penalty + 0.5
+    // Score composite (centré sur 0 : pas de changement structurel = 0)
+    (lcc_score * 0.5) + (clustering_score * 0.3) + fragmentation_penalty
 }
 
 #[cfg(test)]
@@ -369,10 +383,53 @@ mod tests {
         let enriched = "Le félin somnole paisiblement sur le coussin moelleux du salon.";
         let delta = topology_delta(standard, enriched);
 
-        // Le texte enrichi devrait avoir une structure au moins comparable
+        // Sans baseline, le delta est centré sur 0.
+        // Un texte enrichi a un graphe plus large, clustering légèrement différent.
+        assert!(delta.is_finite(), "Delta devrait être fini, got {}", delta);
         assert!(
-            delta > 0.0,
-            "Delta devrait être positif pour texte enrichi structuré"
+            delta > -0.5 && delta < 0.5,
+            "Delta devrait être dans une plage raisonnable, got {}",
+            delta
+        );
+    }
+
+    #[test]
+    fn test_decay_weighting() {
+        // Vérifie que les arêtes proches ont plus de poids que les arêtes distantes
+        let tokens: Vec<String> = vec!["alpha", "beta", "gamma", "delta", "epsilon"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let graph = build_cooccurrence_graph(&tokens);
+
+        // Arête alpha→beta (distance 1, weight = 1/(1+1) = 0.5)
+        let alpha = graph
+            .node_indices()
+            .find(|&n| graph[n] == "alpha")
+            .unwrap();
+        let beta = graph
+            .node_indices()
+            .find(|&n| graph[n] == "beta")
+            .unwrap();
+        let epsilon = graph
+            .node_indices()
+            .find(|&n| graph[n] == "epsilon")
+            .unwrap();
+
+        let w_close = graph
+            .find_edge(alpha, beta)
+            .map(|e| graph[e])
+            .unwrap_or(0.0);
+        let w_far = graph
+            .find_edge(alpha, epsilon)
+            .map(|e| graph[e])
+            .unwrap_or(0.0);
+
+        assert!(
+            w_close > w_far,
+            "Arête proche ({}) devrait peser plus que arête distante ({})",
+            w_close,
+            w_far
         );
     }
 }

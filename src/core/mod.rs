@@ -117,7 +117,7 @@ impl LdsiVerdict {
 
 /// Calcule le score LDSI complet entre deux textes
 ///
-/// Formule: λLD = α·NCD(A,B) + β·(H(B)/H(A)) + γ·ΔGraph
+/// Formule: λLD = α·NCD(A,B) + β·(H(B)/H(A) - 1) + γ·ΔGraph
 ///
 /// # Arguments
 /// * `text_a` - Réponse standard (contrôle)
@@ -153,9 +153,11 @@ pub fn compute_ldsi(
     let topo_delta = topology::topology_delta(text_a, text_b);
 
     // 4. Formule λLD
+    // (ratio - 1) : textes identiques → 0, vocabulaire enrichi → positif
     let lambda = (coef.alpha * ncd_result.score)
-        + (coef.beta * entropy_ratio.min(2.0)) // Cap à 2.0 pour éviter explosion
+        + (coef.beta * (entropy_ratio - 1.0).clamp(-1.0, 2.0))
         + (coef.gamma * topo_delta);
+    let lambda = lambda.max(0.0); // λLD ne peut pas être négatif
 
     let verdict = LdsiVerdict::from_lambda(lambda);
 
@@ -197,8 +199,8 @@ mod tests {
         let text = "Le chat dort sur le canapé.";
         let result = compute_ldsi(text, text, None);
 
-        // Pour textes identiques: NCD≈0, entropy_ratio=1.0, topo_delta=0.5
-        // λLD = 0.4*0 + 0.35*1.0 + 0.25*0.5 ≈ 0.475
+        // Pour textes identiques: NCD≈0.17, entropy_shift=0, topo_delta=0
+        // λLD = 0.50*0.17 + 0.30*0 + 0.20*0 ≈ 0.085
         assert!(
             result.lambda < 0.6,
             "Textes identiques = score bas, got {}",

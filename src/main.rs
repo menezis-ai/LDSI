@@ -77,15 +77,15 @@ enum Commands {
         output: Option<String>,
 
         /// Coefficient alpha (NCD)
-        #[arg(long, default_value = "0.4")]
+        #[arg(long, default_value = "0.50")]
         alpha: f64,
 
         /// Coefficient beta (Entropie)
-        #[arg(long, default_value = "0.35")]
+        #[arg(long, default_value = "0.30")]
         beta: f64,
 
         /// Coefficient gamma (Topologie)
-        #[arg(long, default_value = "0.25")]
+        #[arg(long, default_value = "0.20")]
         gamma: f64,
     },
 

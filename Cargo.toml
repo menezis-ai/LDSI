@@ -59,6 +59,9 @@ futures = "0.3"
 # MIME type detection
 mime_guess = "2.0"
 
+[dev-dependencies]
+wiremock = "0.6"
+
 [profile.release]
 opt-level = 3
 lto = true

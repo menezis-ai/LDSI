@@ -635,4 +635,267 @@ mod tests {
         multi.add_openrouter("openai/gpt-4-turbo", "fake-key");
         assert_eq!(multi.models().len(), 2);
     }
+
+    // ============================================================
+    // MOCK TESTS - Couverture complète via wiremock
+    // ============================================================
+
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn test_ollama_happy_path() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/generate"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "response": "Le chat est un félin domestique."
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let config = LlmConfig {
+            base_url: mock_server.uri(),
+            api_type: ApiType::Ollama,
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject("Qu'est-ce qu'un chat?").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "Le chat est un félin domestique.");
+    }
+
+    #[tokio::test]
+    async fn test_openai_happy_path() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "choices": [{"message": {"content": "La gravité courbe l'espace-temps."}}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let config = LlmConfig {
+            base_url: mock_server.uri(),
+            api_type: ApiType::OpenAI,
+            api_key: Some("test-key".to_string()),
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject("Explique la gravité").await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().contains("espace-temps"));
+    }
+
+    #[tokio::test]
+    async fn test_anthropic_happy_path() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/messages"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "content": [{"text": "Réponse Anthropic simulée."}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let config = LlmConfig {
+            base_url: mock_server.uri(),
+            api_type: ApiType::Anthropic,
+            api_key: Some("test-key".to_string()),
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject("Test").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "Réponse Anthropic simulée.");
+    }
+
+    #[tokio::test]
+    async fn test_openrouter_happy_path() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "choices": [{"message": {"content": "Réponse OpenRouter."}}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let config = LlmConfig {
+            base_url: mock_server.uri(),
+            api_type: ApiType::OpenRouter,
+            api_key: Some("test-key".to_string()),
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject("Test").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "Réponse OpenRouter.");
+    }
+
+    #[tokio::test]
+    async fn test_api_error_429_rate_limit() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/generate"))
+            .respond_with(ResponseTemplate::new(429).set_body_string("Rate limit exceeded"))
+            .mount(&mock_server)
+            .await;
+
+        let config = LlmConfig {
+            base_url: mock_server.uri(),
+            api_type: ApiType::Ollama,
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject("Test").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            InjectorError::ApiError(msg) => assert!(msg.contains("429"), "Got: {}", msg),
+            other => panic!("Expected ApiError, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_api_error_500_server() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(
+                ResponseTemplate::new(500).set_body_string("Internal Server Error"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let config = LlmConfig {
+            base_url: mock_server.uri(),
+            api_type: ApiType::OpenAI,
+            api_key: Some("test-key".to_string()),
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject("Test").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            InjectorError::ApiError(msg) => assert!(msg.contains("500"), "Got: {}", msg),
+            other => panic!("Expected ApiError, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_malformed_json_response() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/generate"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string("{not valid json!!!}"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let config = LlmConfig {
+            base_url: mock_server.uri(),
+            api_type: ApiType::Ollama,
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject("Test").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            InjectorError::ParseError(_) => {}
+            other => panic!("Expected ParseError, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_anthropic_missing_api_key() {
+        let config = LlmConfig {
+            base_url: "http://127.0.0.1:1".to_string(),
+            api_type: ApiType::Anthropic,
+            api_key: None,
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject("Test").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            InjectorError::ApiError(msg) => {
+                assert!(msg.contains("API key"), "Got: {}", msg)
+            }
+            other => panic!("Expected ApiError about missing key, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_openrouter_missing_api_key() {
+        let config = LlmConfig {
+            base_url: "http://127.0.0.1:1".to_string(),
+            api_type: ApiType::OpenRouter,
+            api_key: None,
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject("Test").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            InjectorError::ApiError(msg) => {
+                assert!(msg.contains("API key"), "Got: {}", msg)
+            }
+            other => panic!("Expected ApiError about missing key, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_openai_empty_choices() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "choices": []
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let config = LlmConfig {
+            base_url: mock_server.uri(),
+            api_type: ApiType::OpenAI,
+            api_key: Some("test-key".to_string()),
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject("Test").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            InjectorError::ParseError(msg) => {
+                assert!(msg.contains("No response"), "Got: {}", msg)
+            }
+            other => panic!("Expected ParseError, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_inject_ab_double_call() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/generate"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "response": "Réponse mock."
+            })))
+            .expect(2)
+            .mount(&mock_server)
+            .await;
+
+        let config = LlmConfig {
+            base_url: mock_server.uri(),
+            api_type: ApiType::Ollama,
+            ..Default::default()
+        };
+        let injector = Injector::new(config);
+        let result = injector.inject_ab("prompt A", "prompt B").await;
+        assert!(result.is_ok());
+        let (a, b) = result.unwrap();
+        assert_eq!(a, "Réponse mock.");
+        assert_eq!(b, "Réponse mock.");
+    }
 }

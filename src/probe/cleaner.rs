@@ -7,7 +7,7 @@
 //! LDSI - Lyapunov-Dabert Stability Index
 
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use unicode_normalization::UnicodeNormalization;
 
 /// Stop-words français (mots vides à filtrer)
@@ -165,6 +165,10 @@ pub struct CleanerConfig {
     pub language: Language,
     /// Longueur minimale des mots à conserver
     pub min_word_length: usize,
+    /// Détection dynamique des stopwords par fréquence (loi de Zipf)
+    pub dynamic_stopwords: bool,
+    /// Seuil de fréquence pour la détection dynamique (ratio vs total tokens)
+    pub dynamic_stopwords_threshold: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -185,6 +189,8 @@ impl Default for CleanerConfig {
             normalize_unicode: true,
             language: Language::Both,
             min_word_length: 2,
+            dynamic_stopwords: false,
+            dynamic_stopwords_threshold: 0.01,
         }
     }
 }
@@ -241,13 +247,39 @@ pub fn clean_text(text: &str, config: &CleanerConfig) -> String {
             .collect(),
     };
 
+    // 5b. Détection dynamique des stopwords (loi de Zipf)
+    let dynamic_stops: HashSet<String> = if config.dynamic_stopwords {
+        let all_words: Vec<&str> = result
+            .split_whitespace()
+            .filter(|w| w.len() >= config.min_word_length)
+            .collect();
+        let total = all_words.len();
+        if total > 0 {
+            let mut freq: HashMap<&str, usize> = HashMap::new();
+            for w in &all_words {
+                *freq.entry(w).or_insert(0) += 1;
+            }
+            let min_count =
+                ((total as f64 * config.dynamic_stopwords_threshold).ceil() as usize).max(3);
+            freq.into_iter()
+                .filter(|(_, count)| *count >= min_count)
+                .map(|(word, _)| word.to_string())
+                .collect()
+        } else {
+            HashSet::new()
+        }
+    } else {
+        HashSet::new()
+    };
+
     // 6. Filtrage des mots
     let words: Vec<&str> = result
         .split_whitespace()
         .filter(|word| {
-            let dominated = word.len() >= config.min_word_length;
-            let not_stopword = !config.remove_stopwords || !stopwords.contains(word);
-            dominated && not_stopword
+            let long_enough = word.len() >= config.min_word_length;
+            let not_static = !config.remove_stopwords || !stopwords.contains(word);
+            let not_dynamic = !config.dynamic_stopwords || !dynamic_stops.contains(*word);
+            long_enough && not_static && not_dynamic
         })
         .collect();
 
@@ -333,5 +365,29 @@ mod tests {
         assert!(core.contains("chat"));
         assert!(core.contains("noir"));
         assert!(core.contains("mange"));
+    }
+
+    #[test]
+    fn test_dynamic_stopwords() {
+        // "data" apparaît 8/16 fois (50%) — bruit structurel évident
+        let text = "data processing data analysis data mining data science \
+                     data models data driven data pipeline data warehouse";
+        let config = CleanerConfig {
+            remove_stopwords: false,
+            dynamic_stopwords: true,
+            dynamic_stopwords_threshold: 0.01,
+            ..Default::default()
+        };
+        let cleaned = clean_text(text, &config);
+
+        assert!(
+            !cleaned.contains("data"),
+            "Mot haute fréquence 'data' devrait être filtré: {}",
+            cleaned
+        );
+        assert!(
+            cleaned.contains("processing"),
+            "Mot basse fréquence devrait être conservé"
+        );
     }
 }
